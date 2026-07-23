@@ -68,7 +68,6 @@
 
   let foods = [];
   let dishes = [];
-  let shoppingList = [];
   let weeklyShopping = {};
   let mealPlan = {};
   let weekOffset = 0;
@@ -85,10 +84,8 @@
     menuToggle: document.getElementById("menu-toggle"),
     sideMenu: document.getElementById("side-menu"),
     sideMenuOverlay: document.getElementById("side-menu-overlay"),
-    shoppingListGeneral: document.getElementById("shopping-list-general"),
-    shoppingEmptyGeneral: document.getElementById("shopping-empty-general"),
-    shoppingListWeekly: document.getElementById("shopping-list-weekly"),
-    shoppingEmptyWeekly: document.getElementById("shopping-empty-weekly"),
+    shoppingList: document.getElementById("shopping-list"),
+    shoppingEmpty: document.getElementById("shopping-empty"),
     shoppingWeekLabel: document.getElementById("shopping-week-label"),
     foodGroups: document.getElementById("food-groups"),
     foodsEmpty: document.getElementById("foods-empty"),
@@ -257,7 +254,6 @@
     if (Array.isArray(data.dishes)) {
       dishes = data.dishes.map(migrateDish).filter(Boolean);
     }
-    if (Array.isArray(data.shopping)) shoppingList = data.shopping;
     if (data.weeklyShopping && typeof data.weeklyShopping === "object") {
       weeklyShopping = data.weeklyShopping;
     }
@@ -293,7 +289,6 @@
           if (!isInitialized) {
             foods = createDefaultFoods();
             dishes = [];
-            shoppingList = [];
             weeklyShopping = {};
             mealPlan = {};
             weekOffset = 0;
@@ -319,7 +314,6 @@
       {
         foods: foods,
         dishes: dishes,
-        shopping: shoppingList,
         weeklyShopping: weeklyShopping,
         mealPlan: mealPlan,
         weekOffset: weekOffset,
@@ -460,24 +454,27 @@
     showToast("Gericht gelöscht");
   }
 
-  function addToGeneralShoppingList(food) {
-    const exists = shoppingList.some(function (item) {
+  function addFoodToWeeklyList(food) {
+    const weekKey = weekPlanKey(getWeekStart(weekOffset));
+    const list = getWeeklyList(weekKey);
+    const exists = list.some(function (item) {
       return !item.checked && item.foodId === food.id;
     });
     if (exists) {
       showToast(food.name + " ist bereits auf der Liste");
       return false;
     }
-    shoppingList.unshift({
+    list.unshift({
       id: uid(),
       foodId: food.id,
       name: food.name,
       checked: false,
       addedAt: Date.now(),
+      source: "manual",
     });
     persistAll();
     renderShoppingList();
-    showToast(food.name + " zur allgemeinen Liste hinzugefügt");
+    showToast(food.name + " zur Einkaufsliste hinzugefügt");
     return true;
   }
 
@@ -549,39 +546,18 @@
     els.shoppingWeekLabel.textContent = getWeekLabelText();
 
     renderShoppingItems(
-      els.shoppingListGeneral,
-      els.shoppingEmptyGeneral,
-      shoppingList,
+      els.shoppingList,
+      els.shoppingEmpty,
+      getWeeklyList(weekKey),
       function (id) {
-        shoppingList = shoppingList.map(function (item) {
-          return item.id === id ? Object.assign({}, item, { checked: !item.checked }) : item;
-        });
-        persistAll();
-        renderShoppingList();
-      },
-      function (id) {
-        shoppingList = shoppingList.filter(function (item) {
-          return item.id !== id;
-        });
-        persistAll();
-        renderShoppingList();
-      }
-    );
-
-    const weeklyItems = getWeeklyList(weekKey);
-    renderShoppingItems(
-      els.shoppingListWeekly,
-      els.shoppingEmptyWeekly,
-      weeklyItems,
-      function (id) {
-        weeklyItems.forEach(function (item) {
+        getWeeklyList(weekKey).forEach(function (item) {
           if (item.id === id) item.checked = !item.checked;
         });
         persistAll();
         renderShoppingList();
       },
       function (id) {
-        weeklyShopping[weekKey] = weeklyItems.filter(function (item) {
+        weeklyShopping[weekKey] = getWeeklyList(weekKey).filter(function (item) {
           return item.id !== id;
         });
         persistAll();
@@ -632,7 +608,7 @@
         addBtn.textContent = "+";
         addBtn.addEventListener("click", function (e) {
           e.stopPropagation();
-          addToGeneralShoppingList(food);
+          addFoodToWeeklyList(food);
         });
         row.appendChild(info);
         row.appendChild(addBtn);
@@ -825,7 +801,7 @@
     closeDayPickerModal();
     closeDishDetailModal();
     let msg = dish.name + " für " + dayLabel + " eingeplant";
-    if (added > 0) msg += " – " + added + " Zutat(en) auf Wochen-Einkauf";
+    if (added > 0) msg += " – " + added + " Zutat(en) auf Einkaufsliste";
     showToast(msg);
     if (activeView === "mealplan") renderMealPlan();
     if (activeView === "shopping") renderShoppingList();
@@ -952,7 +928,7 @@
     const food = addFoodToDatabase(name, category);
     els.newFoodName.value = "";
     renderFoods();
-    if (addToList) addToGeneralShoppingList(food);
+    if (addToList) addFoodToWeeklyList(food);
     else showToast(food.name + " in Datenbank gespeichert");
   }
 
@@ -1055,23 +1031,7 @@
     els.foodSearch.addEventListener("input", renderFoods);
     els.dishSearch.addEventListener("input", renderDishes);
 
-    document.getElementById("clear-checked-general").addEventListener("click", function () {
-      shoppingList = shoppingList.filter(function (i) {
-        return i.checked;
-      });
-      persistAll();
-      renderShoppingList();
-      showToast("Erledigte entfernt");
-    });
-    document.getElementById("clear-all-general").addEventListener("click", function () {
-      if (!shoppingList.length) return;
-      if (confirm("Allgemeine Liste leeren?")) {
-        shoppingList = [];
-        persistAll();
-        renderShoppingList();
-      }
-    });
-    document.getElementById("clear-checked-weekly").addEventListener("click", function () {
+    document.getElementById("clear-checked").addEventListener("click", function () {
       const weekKey = weekPlanKey(getWeekStart(weekOffset));
       weeklyShopping[weekKey] = getWeeklyList(weekKey).filter(function (i) {
         return i.checked;
@@ -1080,10 +1040,10 @@
       renderShoppingList();
       showToast("Erledigte entfernt");
     });
-    document.getElementById("clear-all-weekly").addEventListener("click", function () {
+    document.getElementById("clear-all").addEventListener("click", function () {
       const weekKey = weekPlanKey(getWeekStart(weekOffset));
       if (!getWeeklyList(weekKey).length) return;
-      if (confirm("Wochen-Einkauf leeren?")) {
+      if (confirm("Einkaufsliste für diese Woche leeren?")) {
         weeklyShopping[weekKey] = [];
         persistAll();
         renderShoppingList();

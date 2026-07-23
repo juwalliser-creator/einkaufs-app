@@ -63,30 +63,17 @@
   <main class="app-main">
     <!-- Einkaufsliste -->
     <section id="view-shopping" class="view active">
-      <div class="list-section">
-        <h2 class="section-heading">Allgemein</h2>
-        <div class="toolbar">
-          <button type="button" class="btn btn-secondary" id="clear-checked-general">Erledigte entfernen</button>
-          <button type="button" class="btn btn-danger-outline" id="clear-all-general">Liste leeren</button>
-        </div>
-        <ul id="shopping-list-general" class="item-list" aria-label="Allgemeine Einkaufsliste"></ul>
-        <p id="shopping-empty-general" class="empty-state">Noch nichts auf der allgemeinen Liste.</p>
+      <div class="week-nav">
+        <button type="button" class="btn btn-icon" id="prev-week-shopping" aria-label="Vorherige Woche">‹</button>
+        <span id="shopping-week-label">Diese Woche</span>
+        <button type="button" class="btn btn-icon" id="next-week-shopping" aria-label="Nächste Woche">›</button>
       </div>
-
-      <div class="list-section">
-        <h2 class="section-heading">Wochen-Einkauf</h2>
-        <div class="week-nav">
-          <button type="button" class="btn btn-icon" id="prev-week-shopping" aria-label="Vorherige Woche">‹</button>
-          <span id="shopping-week-label">Diese Woche</span>
-          <button type="button" class="btn btn-icon" id="next-week-shopping" aria-label="Nächste Woche">›</button>
-        </div>
-        <div class="toolbar">
-          <button type="button" class="btn btn-secondary" id="clear-checked-weekly">Erledigte entfernen</button>
-          <button type="button" class="btn btn-danger-outline" id="clear-all-weekly">Liste leeren</button>
-        </div>
-        <ul id="shopping-list-weekly" class="item-list" aria-label="Wochen-Einkaufsliste"></ul>
-        <p id="shopping-empty-weekly" class="empty-state">Keine Zutaten für diese Woche. Plane Gerichte im Wochenplan.</p>
+      <div class="toolbar">
+        <button type="button" class="btn btn-secondary" id="clear-checked">Erledigte entfernen</button>
+        <button type="button" class="btn btn-danger-outline" id="clear-all">Liste leeren</button>
       </div>
+      <ul id="shopping-list" class="item-list" aria-label="Einkaufsliste"></ul>
+      <p id="shopping-empty" class="empty-state">Noch nichts auf der Liste. Füge Lebensmittel hinzu oder plane Gerichte im Wochenplan.</p>
     </section>
 
     <!-- Lebensmittel-Datenbank -->
@@ -122,12 +109,14 @@
     <!-- Gerichte -->
     <section id="view-dishes" class="view">
       <div class="dish-filter-bar card">
-        <div class="dish-filter-grid">
-          <button type="button" class="filter-btn" data-filter="diet" data-value="meat">Fleisch</button>
-          <button type="button" class="filter-btn" data-filter="diet" data-value="vegetarian">Vegetarisch</button>
+        <div class="dish-filter-layout">
+          <div class="dish-filter-grid">
+            <button type="button" class="btn btn-primary filter-btn" data-filter="diet" data-value="meat">Fleisch</button>
+            <button type="button" class="btn btn-primary filter-btn" data-filter="diet" data-value="vegetarian">Vegetarisch</button>
+            <button type="button" class="btn btn-primary filter-btn" data-filter="temp" data-value="warm">Warm</button>
+            <button type="button" class="btn btn-primary filter-btn" data-filter="temp" data-value="cold">Kalt</button>
+          </div>
           <button type="button" class="btn btn-primary dish-add-btn" id="open-add-dish-btn">Neues Gericht hinzufügen</button>
-          <button type="button" class="filter-btn" data-filter="temp" data-value="warm">Warm</button>
-          <button type="button" class="filter-btn" data-filter="temp" data-value="cold">Kalt</button>
         </div>
       </div>
 

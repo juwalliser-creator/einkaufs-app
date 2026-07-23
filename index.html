@@ -107,13 +107,15 @@
 
     <!-- Gerichte -->
     <section id="view-dishes" class="view">
-      <div class="dish-filter-bar card">
-        <div class="dish-toolbar">
-          <button type="button" class="dish-toolbar-btn filter-btn" data-filter="diet" data-value="meat">Fleisch</button>
-          <button type="button" class="dish-toolbar-btn filter-btn" data-filter="diet" data-value="vegetarian">Vegetarisch</button>
-          <button type="button" class="dish-toolbar-btn filter-btn" data-filter="temp" data-value="warm">Warm</button>
-          <button type="button" class="dish-toolbar-btn filter-btn" data-filter="temp" data-value="cold">Kalt</button>
-          <button type="button" class="dish-toolbar-btn dish-toolbar-btn--add" id="open-add-dish-btn">Neues Gericht hinzufügen</button>
+      <button type="button" class="btn btn-primary dish-add-primary" id="open-add-dish-btn">+ Neues Gericht hinzufügen</button>
+
+      <div class="dish-filters">
+        <p class="dish-filters-label">Filtern nach</p>
+        <div class="dish-filters-row">
+          <button type="button" class="dish-filter-chip filter-btn" data-filter="diet" data-value="meat">Fleisch</button>
+          <button type="button" class="dish-filter-chip filter-btn" data-filter="diet" data-value="vegetarian">Vegetarisch</button>
+          <button type="button" class="dish-filter-chip filter-btn" data-filter="temp" data-value="warm">Warm</button>
+          <button type="button" class="dish-filter-chip filter-btn" data-filter="temp" data-value="cold">Kalt</button>
         </div>
       </div>
 

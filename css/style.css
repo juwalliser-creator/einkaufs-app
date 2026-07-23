@@ -506,55 +506,58 @@ textarea:focus {
   margin-bottom: 0;
 }
 
-.dish-filter-bar {
+.dish-add-primary {
+  width: 100%;
+  display: block;
+  padding: 1rem 1.25rem;
+  font-size: 1rem;
+  border-radius: var(--radius);
   margin-bottom: 1rem;
-  padding: 0.85rem;
+  box-shadow: var(--shadow);
 }
 
-.dish-toolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(96px, 34%);
-  grid-template-rows: repeat(2, minmax(48px, auto));
+.dish-filters {
+  margin-bottom: 1rem;
+}
+
+.dish-filters-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.dish-filters-row {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
-.dish-toolbar-btn {
-  margin: 0;
-  appearance: none;
-  -webkit-appearance: none;
-  box-sizing: border-box;
-  width: 100%;
-  height: 100%;
-  min-height: 48px;
-  border: none;
-  border-radius: 10px;
-  padding: 0.65rem 0.55rem;
-  font-family: inherit;
-  font-size: 0.84rem;
+.dish-filter-chip {
+  flex: 1 1 calc(50% - 0.25rem);
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  line-height: 1.25;
+  font-family: inherit;
+  line-height: 1.2;
   text-align: center;
-  color: #fff;
-  background: var(--primary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.12s ease, background 0.12s ease;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
-.dish-toolbar-btn:active {
+.dish-filter-chip:active {
   transform: scale(0.98);
 }
 
-.dish-toolbar-btn.filter-btn.active {
-  background: var(--primary-dark);
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
-}
-
-.dish-toolbar-btn--add {
-  grid-column: 3;
-  grid-row: 1 / -1;
+.dish-filter-chip.active {
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  border-color: var(--primary);
 }
 
 .field-label {

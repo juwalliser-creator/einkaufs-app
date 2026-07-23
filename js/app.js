@@ -53,18 +53,9 @@
   ];
 
   const VIEW_META = {
-    shopping: {
-      title: "Einkaufsliste",
-      subtitle: "Gemeinsame Liste – live synchronisiert",
-    },
-    foods: {
-      title: "Lebensmittel",
-      subtitle: "Datenbank durchsuchen & hinzufügen",
-    },
-    mealplan: {
-      title: "Wochenplan",
-      subtitle: "Gerichte für die Woche planen",
-    },
+    shopping: { title: "Einkaufsliste" },
+    foods: { title: "Lebensmittel" },
+    mealplan: { title: "Wochenplan" },
   };
 
   let db = null;
@@ -84,8 +75,6 @@
 
   const els = {
     pageTitle: document.getElementById("page-title"),
-    pageSubtitle: document.getElementById("page-subtitle"),
-    syncStatus: document.getElementById("sync-status"),
     setupOverlay: document.getElementById("setup-overlay"),
     roomCodeInput: document.getElementById("room-code-input"),
     joinRoomBtn: document.getElementById("join-room-btn"),
@@ -132,9 +121,8 @@
     });
   }
 
-  function setSyncStatus(text, state) {
-    els.syncStatus.textContent = text;
-    els.syncStatus.className = "sync-status" + (state ? " " + state : "");
+  function setSyncStatus() {
+    /* Sync-Status wird nicht mehr im Header angezeigt */
   }
 
   function firebaseConfigured() {
@@ -595,9 +583,7 @@
       }
     });
 
-    const meta = VIEW_META[viewName];
-    els.pageTitle.textContent = meta.title;
-    els.pageSubtitle.textContent = meta.subtitle;
+    els.pageTitle.textContent = VIEW_META[viewName].title;
     renderActiveView();
   }
 

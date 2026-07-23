@@ -1,10 +1,8 @@
-const CACHE_NAME = "einkaufs-app-v2";
+const CACHE_NAME = "einkaufs-app-v3";
 const ASSETS = [
   "./",
   "./index.html",
   "./css/style.css",
-  "./js/firebase-config.js",
-  "./js/app.js",
   "./manifest.json",
   "./icons/icon.svg",
 ];
@@ -36,6 +34,21 @@ self.addEventListener("activate", function (event) {
 });
 
 self.addEventListener("fetch", function (event) {
+  const url = new URL(event.request.url);
+  const alwaysFresh =
+    url.pathname.includes("/js/") ||
+    url.pathname.endsWith("/index.html") ||
+    url.pathname.endsWith("/");
+
+  if (alwaysFresh) {
+    event.respondWith(
+      fetch(event.request).catch(function () {
+        return caches.match(event.request);
+      })
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then(function (cached) {
       return cached || fetch(event.request);

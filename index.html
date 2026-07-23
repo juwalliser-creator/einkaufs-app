@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#2d6a4f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Einkauf & Plan">
+  <title>Einkauf & Wochenplan</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-top">
+      <div>
+        <h1 id="page-title">Einkaufsliste</h1>
+        <p class="subtitle" id="page-subtitle">Deine aktuelle Liste</p>
+      </div>
+      <button type="button" class="btn btn-header" id="share-link-btn" title="Link teilen">Link teilen</button>
+    </div>
+    <p class="sync-status" id="sync-status">Verbinde…</p>
+  </header>
+
+  <div id="setup-overlay" class="setup-overlay hidden">
+    <div class="setup-card card">
+      <h2>Gemeinsame Gruppe</h2>
+      <p>Damit ihr beide dieselbe Einkaufsliste seht, braucht ihr denselben Gruppencode.</p>
+      <label for="room-code-input">Gruppencode</label>
+      <input type="text" id="room-code-input" placeholder="z.B. FAMILIE" autocomplete="off" maxlength="32">
+      <div class="button-row">
+        <button type="button" class="btn btn-primary" id="join-room-btn">Beitreten</button>
+        <button type="button" class="btn btn-secondary" id="create-room-btn">Neuen Code erstellen</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="app-main">
+    <!-- Einkaufsliste -->
+    <section id="view-shopping" class="view active">
+      <div class="toolbar">
+        <button type="button" class="btn btn-secondary" id="clear-checked">Erledigte entfernen</button>
+        <button type="button" class="btn btn-danger-outline" id="clear-all">Liste leeren</button>
+      </div>
+      <ul id="shopping-list" class="item-list" aria-label="Einkaufsliste"></ul>
+      <p id="shopping-empty" class="empty-state">Noch nichts auf der Liste. Füge Lebensmittel im Tab „Lebensmittel“ hinzu.</p>
+    </section>
+
+    <!-- Lebensmittel-Datenbank -->
+    <section id="view-foods" class="view">
+      <form id="add-food-form" class="card add-form">
+        <label for="new-food-name">Neues Lebensmittel</label>
+        <div class="input-row">
+          <input type="text" id="new-food-name" placeholder="z.B. Avocado" autocomplete="off" required>
+          <select id="new-food-category" aria-label="Kategorie">
+            <option value="Obst & Gemüse">Obst & Gemüse</option>
+            <option value="Milchprodukte">Milchprodukte</option>
+            <option value="Fleisch & Fisch">Fleisch & Fisch</option>
+            <option value="Backwaren">Backwaren</option>
+            <option value="Vorrat">Vorrat</option>
+            <option value="Getränke">Getränke</option>
+            <option value="Sonstiges">Sonstiges</option>
+          </select>
+        </div>
+        <div class="button-row">
+          <button type="submit" class="btn btn-primary">Speichern & zur Liste</button>
+          <button type="button" class="btn btn-secondary" id="save-food-only">Nur speichern</button>
+        </div>
+      </form>
+
+      <div class="search-box">
+        <input type="search" id="food-search" placeholder="Lebensmittel suchen…" autocomplete="off">
+      </div>
+
+      <div id="food-groups" class="food-groups"></div>
+      <p id="foods-empty" class="empty-state hidden">Keine Lebensmittel gefunden.</p>
+    </section>
+
+    <!-- Wochenplan -->
+    <section id="view-mealplan" class="view">
+      <div class="week-nav">
+        <button type="button" class="btn btn-icon" id="prev-week" aria-label="Vorherige Woche">‹</button>
+        <span id="week-label">Diese Woche</span>
+        <button type="button" class="btn btn-icon" id="next-week" aria-label="Nächste Woche">›</button>
+      </div>
+      <div id="meal-plan" class="meal-plan"></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Hauptnavigation">
+    <button type="button" class="nav-btn active" data-view="shopping" aria-current="page">
+      <span class="nav-icon" aria-hidden="true">🛒</span>
+      <span>Liste</span>
+    </button>
+    <button type="button" class="nav-btn" data-view="foods">
+      <span class="nav-icon" aria-hidden="true">🥬</span>
+      <span>Lebensmittel</span>
+    </button>
+    <button type="button" class="nav-btn" data-view="mealplan">
+      <span class="nav-icon" aria-hidden="true">📅</span>
+      <span>Wochenplan</span>
+    </button>
+  </nav>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

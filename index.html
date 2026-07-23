@@ -142,7 +142,31 @@
       </div>
       <h3 class="section-label">Zutaten</h3>
       <ul id="dish-detail-ingredients" class="ingredient-list"></ul>
-      <button type="button" class="btn btn-primary btn-full" id="add-dish-to-plan-btn">Gericht zum Wochenplan hinzufügen</button>
+      <div class="button-row modal-actions">
+        <button type="button" class="btn btn-secondary btn-full" id="edit-dish-btn">Bearbeiten</button>
+        <button type="button" class="btn btn-primary btn-full" id="add-dish-to-plan-btn">Zum Wochenplan hinzufügen</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="dish-edit-overlay" class="modal-overlay hidden">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h2>Gericht bearbeiten</h2>
+        <button type="button" class="icon-btn modal-close" id="close-dish-edit" aria-label="Schließen">✕</button>
+      </div>
+      <form id="edit-dish-form">
+        <label for="edit-dish-name">Name</label>
+        <input type="text" id="edit-dish-name" autocomplete="off" required>
+
+        <label for="edit-dish-ingredients" style="margin-top: 0.75rem;">Zutaten (eine pro Zeile)</label>
+        <textarea id="edit-dish-ingredients" rows="5"></textarea>
+
+        <div class="button-row" style="margin-top: 0.75rem;">
+          <button type="submit" class="btn btn-primary">Änderungen speichern</button>
+          <button type="button" class="btn btn-secondary" id="cancel-dish-edit">Abbrechen</button>
+        </div>
+      </form>
     </div>
   </div>
 

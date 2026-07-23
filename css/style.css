@@ -574,6 +574,14 @@ textarea:focus {
   width: 100%;
 }
 
+.modal-actions {
+  margin-top: 0.5rem;
+}
+
+.modal-actions .btn-full {
+  flex: 1;
+}
+
 .modal-hint {
   margin: 0 0 0.75rem;
   color: var(--text-muted);

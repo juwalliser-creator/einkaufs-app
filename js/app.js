@@ -98,7 +98,14 @@
     dishDetailTitle: document.getElementById("dish-detail-title"),
     dishDetailIngredients: document.getElementById("dish-detail-ingredients"),
     closeDishDetail: document.getElementById("close-dish-detail"),
+    editDishBtn: document.getElementById("edit-dish-btn"),
     addDishToPlanBtn: document.getElementById("add-dish-to-plan-btn"),
+    dishEditOverlay: document.getElementById("dish-edit-overlay"),
+    editDishForm: document.getElementById("edit-dish-form"),
+    editDishName: document.getElementById("edit-dish-name"),
+    editDishIngredients: document.getElementById("edit-dish-ingredients"),
+    closeDishEdit: document.getElementById("close-dish-edit"),
+    cancelDishEdit: document.getElementById("cancel-dish-edit"),
     dayPickerOverlay: document.getElementById("day-picker-overlay"),
     dayPickerHint: document.getElementById("day-picker-hint"),
     dayPickerList: document.getElementById("day-picker-list"),
@@ -355,6 +362,33 @@
     return dish;
   }
 
+  function updateDish(id, name, ingredientsText) {
+    const cleanName = normalizeName(name);
+    if (!cleanName) return null;
+
+    const dish = findDishById(id);
+    if (!dish) return null;
+
+    dish.name = cleanName;
+    dish.ingredients = parseIngredients(ingredientsText);
+
+    dishes.sort(function (a, b) {
+      return a.name.localeCompare(b.name, "de");
+    });
+
+    Object.keys(mealPlan).forEach(function (weekKey) {
+      DAYS.forEach(function (day) {
+        const entry = mealPlan[weekKey] && mealPlan[weekKey][day.key];
+        if (entry && entry.dishId === id) {
+          entry.dishName = cleanName;
+        }
+      });
+    });
+
+    persistAll();
+    return dish;
+  }
+
   function deleteDish(id) {
     dishes = dishes.filter(function (dish) {
       return dish.id !== id;
@@ -566,6 +600,16 @@
       info.appendChild(name);
       info.appendChild(meta);
 
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "icon-btn";
+      editBtn.setAttribute("aria-label", dish.name + " bearbeiten");
+      editBtn.textContent = "✎";
+      editBtn.addEventListener("click", function (event) {
+        event.stopPropagation();
+        openDishEdit(dish.id);
+      });
+
       const deleteBtn = document.createElement("button");
       deleteBtn.type = "button";
       deleteBtn.className = "icon-btn";
@@ -579,9 +623,10 @@
       });
 
       row.appendChild(info);
+      row.appendChild(editBtn);
       row.appendChild(deleteBtn);
       row.addEventListener("click", function (event) {
-        if (event.target === deleteBtn) return;
+        if (event.target === deleteBtn || event.target === editBtn) return;
         openDishDetail(dish.id);
       });
       row.addEventListener("keydown", function (event) {
@@ -621,6 +666,50 @@
   function closeDishDetailModal() {
     els.dishDetailOverlay.classList.add("hidden");
     selectedDishId = null;
+  }
+
+  function openDishEdit(dishId) {
+    const dish = findDishById(dishId);
+    if (!dish) return;
+
+    selectedDishId = dishId;
+    els.editDishName.value = dish.name;
+    els.editDishIngredients.value = dish.ingredients.join("\n");
+    els.dishDetailOverlay.classList.add("hidden");
+    els.dishEditOverlay.classList.remove("hidden");
+  }
+
+  function closeDishEditModal() {
+    els.dishEditOverlay.classList.add("hidden");
+    els.editDishForm.reset();
+    selectedDishId = null;
+  }
+
+  function handleEditDish(event) {
+    event.preventDefault();
+
+    if (!roomRef) {
+      showToast("Bitte zuerst der Gruppe beitreten");
+      return;
+    }
+
+    if (!selectedDishId) return;
+
+    const name = els.editDishName.value;
+    const ingredients = els.editDishIngredients.value;
+
+    if (!normalizeName(name)) {
+      showToast("Bitte einen Gerichtnamen eingeben");
+      return;
+    }
+
+    const dish = updateDish(selectedDishId, name, ingredients);
+    if (!dish) return;
+
+    closeDishEditModal();
+    renderDishes();
+    if (activeView === "mealplan") renderMealPlan();
+    showToast('Gericht "' + dish.name + '" aktualisiert');
   }
 
   function openDayPicker() {
@@ -969,12 +1058,23 @@
     });
 
     els.closeDishDetail.addEventListener("click", closeDishDetailModal);
+    els.editDishBtn.addEventListener("click", function () {
+      if (selectedDishId) openDishEdit(selectedDishId);
+    });
     els.addDishToPlanBtn.addEventListener("click", openDayPicker);
-    els.closeDayPicker.addEventListener("click", closeDayPickerModal);
+    els.closeDishEdit.addEventListener("click", closeDishEditModal);
+    els.cancelDishEdit.addEventListener("click", closeDishEditModal);
+    els.editDishForm.addEventListener("submit", handleEditDish);
 
     els.dishDetailOverlay.addEventListener("click", function (event) {
       if (event.target === els.dishDetailOverlay) closeDishDetailModal();
     });
+
+    els.dishEditOverlay.addEventListener("click", function (event) {
+      if (event.target === els.dishEditOverlay) closeDishEditModal();
+    });
+
+    els.closeDayPicker.addEventListener("click", closeDayPickerModal);
 
     els.dayPickerOverlay.addEventListener("click", function (event) {
       if (event.target === els.dayPickerOverlay) closeDayPickerModal();

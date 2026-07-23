@@ -430,6 +430,11 @@
         if (entry && entry.dishId === id) entry.dishName = cleanName;
       });
     });
+    Object.keys(weeklyShopping).forEach(function (weekKey) {
+      getWeeklyList(weekKey).forEach(function (item) {
+        if (item.source === "mealplan" && item.dishId === id) item.dishName = cleanName;
+      });
+    });
     persistAll();
     return dish;
   }
@@ -442,6 +447,7 @@
       DAYS.forEach(function (day) {
         const entry = mealPlan[weekKey] && mealPlan[weekKey][day.key];
         if (entry && entry.dishId === id) {
+          removeMealPlanIngredientsFromWeeklyList(weekKey, id, day.key);
           mealPlan[weekKey][day.key] = { dishId: "", dishName: "" };
         }
       });
@@ -450,6 +456,7 @@
     if (selectedDishId === id) closeDishDetailModal();
     renderDishes();
     if (activeView === "mealplan") renderMealPlan();
+    if (activeView === "shopping") renderShoppingList();
     showToast("Gericht gelöscht");
   }
 
@@ -477,30 +484,68 @@
     return true;
   }
 
-  function addIngredientToWeeklyList(weekKey, ingredientName) {
+  function addIngredientToWeeklyList(weekKey, ingredientName, dishId, dishName, dayKey, dayLabel) {
     const clean = normalizeName(ingredientName);
-    if (!clean) return false;
+    if (!clean || !dishId || !dayKey) return false;
     const list = getWeeklyList(weekKey);
     const exists = list.some(function (item) {
-      return !item.checked && item.name.toLowerCase() === clean.toLowerCase();
+      return (
+        !item.checked &&
+        item.source === "mealplan" &&
+        item.dishId === dishId &&
+        item.dayKey === dayKey &&
+        item.name.toLowerCase() === clean.toLowerCase()
+      );
     });
     if (exists) return false;
-    list.unshift({
+    list.push({
       id: uid(),
       name: clean,
       checked: false,
       addedAt: Date.now(),
       source: "mealplan",
+      dishId: dishId,
+      dishName: dishName,
+      dayKey: dayKey,
+      dayLabel: dayLabel,
     });
     return true;
   }
 
-  function syncDishIngredientsToWeeklyList(dish, weekKey) {
+  function removeMealPlanIngredientsFromWeeklyList(weekKey, dishId, dayKey) {
+    if (!dishId || !dayKey) return;
+    weeklyShopping[weekKey] = getWeeklyList(weekKey).filter(function (item) {
+      if (item.source !== "mealplan") return true;
+      if (!item.dishId || !item.dayKey) return true;
+      return !(item.dishId === dishId && item.dayKey === dayKey);
+    });
+  }
+
+  function syncDishIngredientsToWeeklyList(dish, weekKey, dayKey, dayLabel) {
     let added = 0;
     dish.ingredients.forEach(function (ingredient) {
-      if (addIngredientToWeeklyList(weekKey, ingredient)) added += 1;
+      if (addIngredientToWeeklyList(weekKey, ingredient, dish.id, dish.name, dayKey, dayLabel)) {
+        added += 1;
+      }
     });
     return added;
+  }
+
+  function shoppingItemDisplayName(item) {
+    if (item.source === "mealplan" && item.dishName && item.dayLabel) {
+      return item.name + " (" + item.dishName + ", " + item.dayLabel + ")";
+    }
+    return item.name;
+  }
+
+  function sortShoppingItems(items) {
+    return items.slice().sort(function (a, b) {
+      const nameCmp = a.name.localeCompare(b.name, "de", { sensitivity: "base" });
+      if (nameCmp !== 0) return nameCmp;
+      const dishCmp = (a.dishName || "").localeCompare(b.dishName || "", "de", { sensitivity: "base" });
+      if (dishCmp !== 0) return dishCmp;
+      return (a.dayLabel || "").localeCompare(b.dayLabel || "", "de", { sensitivity: "base" });
+    });
   }
 
   function renderShoppingItems(container, emptyEl, items, onToggle, onRemove) {
@@ -524,11 +569,11 @@
       checkboxWrap.appendChild(checkbox);
       const name = document.createElement("span");
       name.className = "item-name";
-      name.textContent = item.name;
+      name.textContent = shoppingItemDisplayName(item);
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
       removeBtn.className = "icon-btn";
-      removeBtn.setAttribute("aria-label", item.name + " entfernen");
+      removeBtn.setAttribute("aria-label", shoppingItemDisplayName(item) + " entfernen");
       removeBtn.textContent = "✕";
       removeBtn.addEventListener("click", function () {
         onRemove(item.id);
@@ -547,7 +592,7 @@
     renderShoppingItems(
       els.shoppingList,
       els.shoppingEmpty,
-      getWeeklyList(weekKey),
+      sortShoppingItems(getWeeklyList(weekKey)),
       function (id) {
         getWeeklyList(weekKey).forEach(function (item) {
           if (item.id === id) item.checked = !item.checked;
@@ -794,8 +839,12 @@
 
   function assignDishToDay(dish, weekKey, dayKey, dayLabel) {
     if (!mealPlan[weekKey]) mealPlan[weekKey] = {};
+    const previous = getDayEntry(weekKey, dayKey);
+    if (previous.dishId) {
+      removeMealPlanIngredientsFromWeeklyList(weekKey, previous.dishId, dayKey);
+    }
     mealPlan[weekKey][dayKey] = { dishId: dish.id, dishName: dish.name };
-    const added = syncDishIngredientsToWeeklyList(dish, weekKey);
+    const added = syncDishIngredientsToWeeklyList(dish, weekKey, dayKey, dayLabel);
     persistAll();
     closeDayPickerModal();
     closeDishDetailModal();
@@ -808,9 +857,14 @@
 
   function clearDayEntry(weekKey, dayKey) {
     if (!mealPlan[weekKey]) return;
+    const entry = getDayEntry(weekKey, dayKey);
+    if (entry.dishId) {
+      removeMealPlanIngredientsFromWeeklyList(weekKey, entry.dishId, dayKey);
+    }
     mealPlan[weekKey][dayKey] = { dishId: "", dishName: "" };
     persistAll();
     renderMealPlan();
+    if (activeView === "shopping") renderShoppingList();
     showToast("Tag geleert");
   }
 

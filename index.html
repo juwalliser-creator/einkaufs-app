@@ -63,12 +63,30 @@
   <main class="app-main">
     <!-- Einkaufsliste -->
     <section id="view-shopping" class="view active">
-      <div class="toolbar">
-        <button type="button" class="btn btn-secondary" id="clear-checked">Erledigte entfernen</button>
-        <button type="button" class="btn btn-danger-outline" id="clear-all">Liste leeren</button>
+      <div class="list-section">
+        <h2 class="section-heading">Allgemein</h2>
+        <div class="toolbar">
+          <button type="button" class="btn btn-secondary" id="clear-checked-general">Erledigte entfernen</button>
+          <button type="button" class="btn btn-danger-outline" id="clear-all-general">Liste leeren</button>
+        </div>
+        <ul id="shopping-list-general" class="item-list" aria-label="Allgemeine Einkaufsliste"></ul>
+        <p id="shopping-empty-general" class="empty-state">Noch nichts auf der allgemeinen Liste.</p>
       </div>
-      <ul id="shopping-list" class="item-list" aria-label="Einkaufsliste"></ul>
-      <p id="shopping-empty" class="empty-state">Noch nichts auf der Liste. Füge Lebensmittel im Tab „Lebensmittel“ hinzu.</p>
+
+      <div class="list-section">
+        <h2 class="section-heading">Wochen-Einkauf</h2>
+        <div class="week-nav">
+          <button type="button" class="btn btn-icon" id="prev-week-shopping" aria-label="Vorherige Woche">‹</button>
+          <span id="shopping-week-label">Diese Woche</span>
+          <button type="button" class="btn btn-icon" id="next-week-shopping" aria-label="Nächste Woche">›</button>
+        </div>
+        <div class="toolbar">
+          <button type="button" class="btn btn-secondary" id="clear-checked-weekly">Erledigte entfernen</button>
+          <button type="button" class="btn btn-danger-outline" id="clear-all-weekly">Liste leeren</button>
+        </div>
+        <ul id="shopping-list-weekly" class="item-list" aria-label="Wochen-Einkaufsliste"></ul>
+        <p id="shopping-empty-weekly" class="empty-state">Keine Zutaten für diese Woche. Plane Gerichte im Wochenplan.</p>
+      </div>
     </section>
 
     <!-- Lebensmittel-Datenbank -->
@@ -103,24 +121,22 @@
 
     <!-- Gerichte -->
     <section id="view-dishes" class="view">
-      <form id="add-dish-form" class="card add-form">
-        <label for="new-dish-name">Neues Gericht</label>
-        <input type="text" id="new-dish-name" placeholder="z.B. Spaghetti Bolognese" autocomplete="off" required>
-
-        <label for="new-dish-ingredients" style="margin-top: 0.75rem;">Zutaten (eine pro Zeile)</label>
-        <textarea id="new-dish-ingredients" placeholder="Nudeln&#10;Tomaten&#10;Hackfleisch&#10;Zwiebeln" rows="4"></textarea>
-
-        <div class="button-row" style="margin-top: 0.75rem;">
-          <button type="submit" class="btn btn-primary">Gericht speichern</button>
+      <div class="dish-filter-bar card">
+        <div class="dish-filter-grid">
+          <button type="button" class="filter-btn" data-filter="diet" data-value="meat">Fleisch</button>
+          <button type="button" class="filter-btn" data-filter="diet" data-value="vegetarian">Vegetarisch</button>
+          <button type="button" class="btn btn-primary dish-add-btn" id="open-add-dish-btn">Neues Gericht hinzufügen</button>
+          <button type="button" class="filter-btn" data-filter="temp" data-value="warm">Warm</button>
+          <button type="button" class="filter-btn" data-filter="temp" data-value="cold">Kalt</button>
         </div>
-      </form>
+      </div>
 
       <div class="search-box">
         <input type="search" id="dish-search" placeholder="Gerichte suchen…" autocomplete="off">
       </div>
 
       <div id="dish-list" class="dish-list"></div>
-      <p id="dishes-empty" class="empty-state hidden">Noch keine Gerichte. Lege oben dein erstes Gericht an.</p>
+      <p id="dishes-empty" class="empty-state hidden">Keine Gerichte in dieser Kategorie.</p>
     </section>
 
     <!-- Wochenplan -->
@@ -134,12 +150,45 @@
     </section>
   </main>
 
+  <div id="dish-add-overlay" class="modal-overlay hidden">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h2>Neues Gericht</h2>
+        <button type="button" class="icon-btn modal-close" id="close-dish-add" aria-label="Schließen">✕</button>
+      </div>
+      <form id="add-dish-form">
+        <label for="new-dish-name">Name</label>
+        <input type="text" id="new-dish-name" placeholder="z.B. Spaghetti Bolognese" autocomplete="off" required>
+
+        <p class="field-label" style="margin-top: 0.75rem;">Art</p>
+        <div class="toggle-group">
+          <label class="toggle-option"><input type="radio" name="new-dish-diet" value="meat" required> Fleisch</label>
+          <label class="toggle-option"><input type="radio" name="new-dish-diet" value="vegetarian"> Vegetarisch</label>
+        </div>
+
+        <p class="field-label" style="margin-top: 0.75rem;">Temperatur</p>
+        <div class="toggle-group">
+          <label class="toggle-option"><input type="radio" name="new-dish-temp" value="warm" required> Warm</label>
+          <label class="toggle-option"><input type="radio" name="new-dish-temp" value="cold"> Kalt</label>
+        </div>
+
+        <label for="new-dish-ingredients" style="margin-top: 0.75rem;">Zutaten (eine pro Zeile)</label>
+        <textarea id="new-dish-ingredients" placeholder="Nudeln&#10;Tomaten&#10;Hackfleisch" rows="4"></textarea>
+
+        <div class="button-row" style="margin-top: 0.75rem;">
+          <button type="submit" class="btn btn-primary">Gericht speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="dish-detail-overlay" class="modal-overlay hidden">
     <div class="modal-card card">
       <div class="modal-header">
         <h2 id="dish-detail-title">Gericht</h2>
         <button type="button" class="icon-btn modal-close" id="close-dish-detail" aria-label="Schließen">✕</button>
       </div>
+      <p id="dish-detail-meta" class="dish-meta"></p>
       <h3 class="section-label">Zutaten</h3>
       <ul id="dish-detail-ingredients" class="ingredient-list"></ul>
       <div class="button-row modal-actions">
@@ -158,6 +207,18 @@
       <form id="edit-dish-form">
         <label for="edit-dish-name">Name</label>
         <input type="text" id="edit-dish-name" autocomplete="off" required>
+
+        <p class="field-label" style="margin-top: 0.75rem;">Art</p>
+        <div class="toggle-group">
+          <label class="toggle-option"><input type="radio" name="edit-dish-diet" value="meat" required> Fleisch</label>
+          <label class="toggle-option"><input type="radio" name="edit-dish-diet" value="vegetarian"> Vegetarisch</label>
+        </div>
+
+        <p class="field-label" style="margin-top: 0.75rem;">Temperatur</p>
+        <div class="toggle-group">
+          <label class="toggle-option"><input type="radio" name="edit-dish-temp" value="warm" required> Warm</label>
+          <label class="toggle-option"><input type="radio" name="edit-dish-temp" value="cold"> Kalt</label>
+        </div>
 
         <label for="edit-dish-ingredients" style="margin-top: 0.75rem;">Zutaten (eine pro Zeile)</label>
         <textarea id="edit-dish-ingredients" rows="5"></textarea>

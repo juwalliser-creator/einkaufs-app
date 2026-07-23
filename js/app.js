@@ -13,6 +13,9 @@
     { key: "sunday", label: "Sonntag" },
   ];
 
+  const DIET_LABELS = { meat: "Fleisch", vegetarian: "Vegetarisch" };
+  const TEMP_LABELS = { warm: "Warm", cold: "Kalt" };
+
   const DEFAULT_FOODS = [
     { name: "Milch", category: "Milchprodukte" },
     { name: "Butter", category: "Milchprodukte" },
@@ -66,8 +69,11 @@
   let foods = [];
   let dishes = [];
   let shoppingList = [];
+  let weeklyShopping = {};
   let mealPlan = {};
   let weekOffset = 0;
+
+  let dishFilter = { diet: null, temp: null };
 
   const els = {
     pageTitle: document.getElementById("page-title"),
@@ -79,8 +85,11 @@
     menuToggle: document.getElementById("menu-toggle"),
     sideMenu: document.getElementById("side-menu"),
     sideMenuOverlay: document.getElementById("side-menu-overlay"),
-    shoppingList: document.getElementById("shopping-list"),
-    shoppingEmpty: document.getElementById("shopping-empty"),
+    shoppingListGeneral: document.getElementById("shopping-list-general"),
+    shoppingEmptyGeneral: document.getElementById("shopping-empty-general"),
+    shoppingListWeekly: document.getElementById("shopping-list-weekly"),
+    shoppingEmptyWeekly: document.getElementById("shopping-empty-weekly"),
+    shoppingWeekLabel: document.getElementById("shopping-week-label"),
     foodGroups: document.getElementById("food-groups"),
     foodsEmpty: document.getElementById("foods-empty"),
     foodSearch: document.getElementById("food-search"),
@@ -88,6 +97,9 @@
     newFoodName: document.getElementById("new-food-name"),
     newFoodCategory: document.getElementById("new-food-category"),
     saveFoodOnly: document.getElementById("save-food-only"),
+    openAddDishBtn: document.getElementById("open-add-dish-btn"),
+    dishAddOverlay: document.getElementById("dish-add-overlay"),
+    closeDishAdd: document.getElementById("close-dish-add"),
     addDishForm: document.getElementById("add-dish-form"),
     newDishName: document.getElementById("new-dish-name"),
     newDishIngredients: document.getElementById("new-dish-ingredients"),
@@ -96,6 +108,7 @@
     dishesEmpty: document.getElementById("dishes-empty"),
     dishDetailOverlay: document.getElementById("dish-detail-overlay"),
     dishDetailTitle: document.getElementById("dish-detail-title"),
+    dishDetailMeta: document.getElementById("dish-detail-meta"),
     dishDetailIngredients: document.getElementById("dish-detail-ingredients"),
     closeDishDetail: document.getElementById("close-dish-detail"),
     editDishBtn: document.getElementById("edit-dish-btn"),
@@ -137,12 +150,33 @@
   }
 
   function parseIngredients(text) {
-    return text
-      .split("\n")
-      .map(function (line) {
-        return normalizeName(line);
-      })
-      .filter(Boolean);
+    return text.split("\n").map(normalizeName).filter(Boolean);
+  }
+
+  function migrateDish(dish) {
+    if (!dish || typeof dish !== "object") return null;
+    return {
+      id: dish.id || uid(),
+      name: dish.name || "",
+      ingredients: Array.isArray(dish.ingredients) ? dish.ingredients : [],
+      diet: dish.diet === "meat" ? "meat" : "vegetarian",
+      temp: dish.temp === "cold" ? "cold" : "warm",
+    };
+  }
+
+  function dishCategoryLabel(dish) {
+    return DIET_LABELS[dish.diet] + " · " + TEMP_LABELS[dish.temp];
+  }
+
+  function getRadioValue(name) {
+    const selected = document.querySelector('input[name="' + name + '"]:checked');
+    return selected ? selected.value : null;
+  }
+
+  function setRadioValue(name, value) {
+    document.querySelectorAll('input[name="' + name + '"]').forEach(function (input) {
+      input.checked = input.value === value;
+    });
   }
 
   function createDefaultFoods() {
@@ -150,8 +184,6 @@
       return { id: uid(), name: item.name, category: item.category };
     });
   }
-
-  function setSyncStatus() {}
 
   function firebaseConfigured() {
     const config = window.FIREBASE_CONFIG || {};
@@ -164,8 +196,7 @@
   }
 
   function getRoomFromUrl() {
-    const params = new URLSearchParams(window.location.search);
-    return normalizeRoomCode(params.get("gruppe") || "");
+    return normalizeRoomCode(new URLSearchParams(window.location.search).get("gruppe") || "");
   }
 
   function getStoredRoom() {
@@ -198,9 +229,7 @@
   function generateRoomCode() {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let code = "";
-    for (let i = 0; i < 6; i += 1) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
+    for (let i = 0; i < 6; i += 1) code += chars.charAt(Math.floor(Math.random() * chars.length));
     return code;
   }
 
@@ -209,33 +238,29 @@
       showSetupOverlay(window.DEFAULT_GROUP_CODE || "FAMILIE");
       return false;
     }
-
-    if (!firebase.apps.length) {
-      firebase.initializeApp(window.FIREBASE_CONFIG);
-    }
+    if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
     db = firebase.firestore();
     return true;
   }
 
   function migrateMealPlanEntry(entry) {
-    if (!entry || typeof entry !== "object") {
-      return { dishId: "", dishName: "" };
-    }
+    if (!entry || typeof entry !== "object") return { dishId: "", dishName: "" };
     if (entry.dishId !== undefined || entry.dishName !== undefined) {
-      return {
-        dishId: entry.dishId || "",
-        dishName: entry.dishName || "",
-      };
+      return { dishId: entry.dishId || "", dishName: entry.dishName || "" };
     }
-    const legacyName = entry.lunch || entry.dinner || entry.breakfast || "";
-    return { dishId: "", dishName: legacyName };
+    return { dishId: "", dishName: entry.lunch || entry.dinner || entry.breakfast || "" };
   }
 
   function applyRemoteData(data) {
     isRemoteUpdate = true;
     if (Array.isArray(data.foods)) foods = data.foods;
-    if (Array.isArray(data.dishes)) dishes = data.dishes;
+    if (Array.isArray(data.dishes)) {
+      dishes = data.dishes.map(migrateDish).filter(Boolean);
+    }
     if (Array.isArray(data.shopping)) shoppingList = data.shopping;
+    if (data.weeklyShopping && typeof data.weeklyShopping === "object") {
+      weeklyShopping = data.weeklyShopping;
+    }
     if (data.mealPlan && typeof data.mealPlan === "object") mealPlan = data.mealPlan;
     if (typeof data.weekOffset === "number") weekOffset = data.weekOffset;
     isRemoteUpdate = false;
@@ -249,31 +274,27 @@
       showToast("Bitte einen Gruppencode eingeben");
       return;
     }
-
     if (!initFirebase()) {
       showToast("Firebase zuerst einrichten (FIREBASE-SETUP.md)");
       return;
     }
-
     if (unsubscribeRoom) {
       unsubscribeRoom();
       unsubscribeRoom = null;
     }
-
     saveRoom(normalized);
     hideSetupOverlay();
-
     roomRef = db.collection("rooms").doc(roomCode);
 
     unsubscribeRoom = roomRef.onSnapshot(
       function (snapshot) {
         if (pendingWrites > 0) return;
-
         if (!snapshot.exists) {
           if (!isInitialized) {
             foods = createDefaultFoods();
             dishes = [];
             shoppingList = [];
+            weeklyShopping = {};
             mealPlan = {};
             weekOffset = 0;
             isInitialized = true;
@@ -282,7 +303,6 @@
           }
           return;
         }
-
         applyRemoteData(snapshot.data());
       },
       function (error) {
@@ -294,20 +314,19 @@
 
   function persistAll() {
     if (isRemoteUpdate || !roomRef) return;
-
     pendingWrites += 1;
     roomRef.set(
       {
         foods: foods,
         dishes: dishes,
         shopping: shoppingList,
+        weeklyShopping: weeklyShopping,
         mealPlan: mealPlan,
         weekOffset: weekOffset,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
-    ).catch(function (error) {
-      console.error(error);
+    ).catch(function () {
       showToast("Konnte nicht speichern");
     }).finally(function () {
       setTimeout(function () {
@@ -316,26 +335,63 @@
     });
   }
 
+  function getWeekStart(offset) {
+    const now = new Date();
+    const day = now.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const monday = new Date(now);
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() + diffToMonday + offset * 7);
+    return monday;
+  }
+
+  function formatDate(date) {
+    return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+  }
+
+  function weekPlanKey(weekStart) {
+    return weekStart.toISOString().slice(0, 10);
+  }
+
+  function getWeekLabelText() {
+    const weekStart = getWeekStart(weekOffset);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    if (weekOffset === 0) return "Diese Woche";
+    if (weekOffset === 1) return "Nächste Woche";
+    if (weekOffset === -1) return "Letzte Woche";
+    return formatDate(weekStart) + " – " + formatDate(weekEnd);
+  }
+
+  function changeWeekOffset(delta) {
+    weekOffset += delta;
+    persistAll();
+    renderActiveView();
+  }
+
+  function getWeeklyList(weekKey) {
+    if (!weeklyShopping[weekKey]) weeklyShopping[weekKey] = [];
+    return weeklyShopping[weekKey];
+  }
+
   function findFoodByName(name) {
-    const normalized = normalizeName(name).toLowerCase();
-    return foods.find(function (food) {
-      return food.name.toLowerCase() === normalized;
+    const n = normalizeName(name).toLowerCase();
+    return foods.find(function (f) {
+      return f.name.toLowerCase() === n;
     });
   }
 
   function findDishById(id) {
-    return dishes.find(function (dish) {
-      return dish.id === id;
+    return dishes.find(function (d) {
+      return d.id === id;
     });
   }
 
   function addFoodToDatabase(name, category) {
     const cleanName = normalizeName(name);
     if (!cleanName) return null;
-
     const existing = findFoodByName(cleanName);
     if (existing) return existing;
-
     const food = { id: uid(), name: cleanName, category: category || "Sonstiges" };
     foods.push(food);
     foods.sort(function (a, b) {
@@ -345,14 +401,15 @@
     return food;
   }
 
-  function addDish(name, ingredientsText) {
+  function addDish(name, ingredientsText, diet, temp) {
     const cleanName = normalizeName(name);
-    if (!cleanName) return null;
-
+    if (!cleanName || !diet || !temp) return null;
     const dish = {
       id: uid(),
       name: cleanName,
       ingredients: parseIngredients(ingredientsText),
+      diet: diet,
+      temp: temp,
     };
     dishes.push(dish);
     dishes.sort(function (a, b) {
@@ -362,38 +419,32 @@
     return dish;
   }
 
-  function updateDish(id, name, ingredientsText) {
+  function updateDish(id, name, ingredientsText, diet, temp) {
     const cleanName = normalizeName(name);
-    if (!cleanName) return null;
-
+    if (!cleanName || !diet || !temp) return null;
     const dish = findDishById(id);
     if (!dish) return null;
-
     dish.name = cleanName;
     dish.ingredients = parseIngredients(ingredientsText);
-
+    dish.diet = diet;
+    dish.temp = temp;
     dishes.sort(function (a, b) {
       return a.name.localeCompare(b.name, "de");
     });
-
     Object.keys(mealPlan).forEach(function (weekKey) {
       DAYS.forEach(function (day) {
         const entry = mealPlan[weekKey] && mealPlan[weekKey][day.key];
-        if (entry && entry.dishId === id) {
-          entry.dishName = cleanName;
-        }
+        if (entry && entry.dishId === id) entry.dishName = cleanName;
       });
     });
-
     persistAll();
     return dish;
   }
 
   function deleteDish(id) {
-    dishes = dishes.filter(function (dish) {
-      return dish.id !== id;
+    dishes = dishes.filter(function (d) {
+      return d.id !== id;
     });
-
     Object.keys(mealPlan).forEach(function (weekKey) {
       DAYS.forEach(function (day) {
         const entry = mealPlan[weekKey] && mealPlan[weekKey][day.key];
@@ -402,26 +453,21 @@
         }
       });
     });
-
     persistAll();
-    if (selectedDishId === id) {
-      closeDishDetailModal();
-    }
+    if (selectedDishId === id) closeDishDetailModal();
     renderDishes();
     if (activeView === "mealplan") renderMealPlan();
     showToast("Gericht gelöscht");
   }
 
-  function addToShoppingList(food) {
-    const alreadyOnList = shoppingList.some(function (item) {
+  function addToGeneralShoppingList(food) {
+    const exists = shoppingList.some(function (item) {
       return !item.checked && item.foodId === food.id;
     });
-
-    if (alreadyOnList) {
+    if (exists) {
       showToast(food.name + " ist bereits auf der Liste");
       return false;
     }
-
     shoppingList.unshift({
       id: uid(),
       foodId: food.id,
@@ -431,156 +477,200 @@
     });
     persistAll();
     renderShoppingList();
-    showToast(food.name + " zur Einkaufsliste hinzugefügt");
+    showToast(food.name + " zur allgemeinen Liste hinzugefügt");
     return true;
   }
 
-  function removeShoppingItem(id) {
-    shoppingList = shoppingList.filter(function (item) {
-      return item.id !== id;
+  function addIngredientToWeeklyList(weekKey, ingredientName) {
+    const clean = normalizeName(ingredientName);
+    if (!clean) return false;
+    const list = getWeeklyList(weekKey);
+    const exists = list.some(function (item) {
+      return !item.checked && item.name.toLowerCase() === clean.toLowerCase();
     });
-    persistAll();
-    renderShoppingList();
+    if (exists) return false;
+    list.unshift({
+      id: uid(),
+      name: clean,
+      checked: false,
+      addedAt: Date.now(),
+      source: "mealplan",
+    });
+    return true;
   }
 
-  function toggleShoppingItem(id) {
-    shoppingList = shoppingList.map(function (item) {
-      if (item.id === id) {
-        return Object.assign({}, item, { checked: !item.checked });
-      }
-      return item;
+  function syncDishIngredientsToWeeklyList(dish, weekKey) {
+    let added = 0;
+    dish.ingredients.forEach(function (ingredient) {
+      if (addIngredientToWeeklyList(weekKey, ingredient)) added += 1;
     });
-    persistAll();
-    renderShoppingList();
+    return added;
   }
 
-  function renderShoppingList() {
-    els.shoppingList.innerHTML = "";
-
-    if (shoppingList.length === 0) {
-      els.shoppingEmpty.classList.remove("hidden");
+  function renderShoppingItems(container, emptyEl, items, onToggle, onRemove) {
+    container.innerHTML = "";
+    if (items.length === 0) {
+      emptyEl.classList.remove("hidden");
       return;
     }
-
-    els.shoppingEmpty.classList.add("hidden");
-
-    shoppingList.forEach(function (item) {
+    emptyEl.classList.add("hidden");
+    items.forEach(function (item) {
       const li = document.createElement("li");
       li.className = "item-row" + (item.checked ? " checked" : "");
-
       const checkboxWrap = document.createElement("label");
       checkboxWrap.className = "checkbox-wrap";
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.checked = item.checked;
       checkbox.addEventListener("change", function () {
-        toggleShoppingItem(item.id);
+        onToggle(item.id);
       });
       checkboxWrap.appendChild(checkbox);
-
       const name = document.createElement("span");
       name.className = "item-name";
       name.textContent = item.name;
-
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
       removeBtn.className = "icon-btn";
       removeBtn.setAttribute("aria-label", item.name + " entfernen");
       removeBtn.textContent = "✕";
       removeBtn.addEventListener("click", function () {
-        removeShoppingItem(item.id);
+        onRemove(item.id);
       });
-
       li.appendChild(checkboxWrap);
       li.appendChild(name);
       li.appendChild(removeBtn);
-      els.shoppingList.appendChild(li);
+      container.appendChild(li);
     });
+  }
+
+  function renderShoppingList() {
+    const weekKey = weekPlanKey(getWeekStart(weekOffset));
+    els.shoppingWeekLabel.textContent = getWeekLabelText();
+
+    renderShoppingItems(
+      els.shoppingListGeneral,
+      els.shoppingEmptyGeneral,
+      shoppingList,
+      function (id) {
+        shoppingList = shoppingList.map(function (item) {
+          return item.id === id ? Object.assign({}, item, { checked: !item.checked }) : item;
+        });
+        persistAll();
+        renderShoppingList();
+      },
+      function (id) {
+        shoppingList = shoppingList.filter(function (item) {
+          return item.id !== id;
+        });
+        persistAll();
+        renderShoppingList();
+      }
+    );
+
+    const weeklyItems = getWeeklyList(weekKey);
+    renderShoppingItems(
+      els.shoppingListWeekly,
+      els.shoppingEmptyWeekly,
+      weeklyItems,
+      function (id) {
+        weeklyItems.forEach(function (item) {
+          if (item.id === id) item.checked = !item.checked;
+        });
+        persistAll();
+        renderShoppingList();
+      },
+      function (id) {
+        weeklyShopping[weekKey] = weeklyItems.filter(function (item) {
+          return item.id !== id;
+        });
+        persistAll();
+        renderShoppingList();
+      }
+    );
   }
 
   function renderFoods() {
     const query = els.foodSearch.value.trim().toLowerCase();
     const filtered = foods.filter(function (food) {
-      return (
-        food.name.toLowerCase().includes(query) ||
-        food.category.toLowerCase().includes(query)
-      );
+      return food.name.toLowerCase().includes(query) || food.category.toLowerCase().includes(query);
     });
-
     const grouped = {};
     filtered.forEach(function (food) {
       if (!grouped[food.category]) grouped[food.category] = [];
       grouped[food.category].push(food);
     });
-
     els.foodGroups.innerHTML = "";
     const categories = Object.keys(grouped).sort(function (a, b) {
       return a.localeCompare(b, "de");
     });
-
     if (categories.length === 0) {
       els.foodsEmpty.classList.remove("hidden");
       return;
     }
-
     els.foodsEmpty.classList.add("hidden");
-
     categories.forEach(function (category) {
       const section = document.createElement("section");
       section.className = "food-group";
-
       const heading = document.createElement("h3");
       heading.textContent = category;
       section.appendChild(heading);
-
       const list = document.createElement("div");
       list.className = "food-group-list";
-
       grouped[category].forEach(function (food) {
         const row = document.createElement("div");
         row.className = "food-row";
-
         const info = document.createElement("div");
         info.style.flex = "1";
         const name = document.createElement("div");
         name.className = "item-name";
         name.textContent = food.name;
         info.appendChild(name);
-
         const addBtn = document.createElement("button");
         addBtn.type = "button";
         addBtn.className = "btn btn-add";
-        addBtn.setAttribute("aria-label", food.name + " zur Liste hinzufügen");
         addBtn.textContent = "+";
-        addBtn.addEventListener("click", function (event) {
-          event.stopPropagation();
-          addToShoppingList(food);
+        addBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          addToGeneralShoppingList(food);
         });
-
         row.appendChild(info);
         row.appendChild(addBtn);
         list.appendChild(row);
       });
-
       section.appendChild(list);
       els.foodGroups.appendChild(section);
     });
   }
 
+  function dishMatchesFilter(dish) {
+    if (dishFilter.diet && dish.diet !== dishFilter.diet) return false;
+    if (dishFilter.temp && dish.temp !== dishFilter.temp) return false;
+    return true;
+  }
+
+  function updateFilterButtons() {
+    document.querySelectorAll(".filter-btn").forEach(function (btn) {
+      const type = btn.dataset.filter;
+      const value = btn.dataset.value;
+      btn.classList.toggle("active", dishFilter[type] === value);
+    });
+  }
+
   function renderDishes() {
+    updateFilterButtons();
     const query = els.dishSearch.value.trim().toLowerCase();
     const filtered = dishes.filter(function (dish) {
-      const ingredientText = dish.ingredients.join(" ").toLowerCase();
-      return dish.name.toLowerCase().includes(query) || ingredientText.includes(query);
+      if (!dishMatchesFilter(dish)) return false;
+      const ing = dish.ingredients.join(" ").toLowerCase();
+      return dish.name.toLowerCase().includes(query) || ing.includes(query);
     });
 
     els.dishList.innerHTML = "";
-
     if (filtered.length === 0) {
       els.dishesEmpty.classList.remove("hidden");
       return;
     }
-
     els.dishesEmpty.classList.add("hidden");
 
     filtered.forEach(function (dish) {
@@ -596,70 +686,73 @@
       name.textContent = dish.name;
       const meta = document.createElement("div");
       meta.className = "item-meta";
-      meta.textContent = dish.ingredients.length + " Zutat(en)";
+      meta.textContent = dishCategoryLabel(dish) + " · " + dish.ingredients.length + " Zutat(en)";
       info.appendChild(name);
       info.appendChild(meta);
 
       const editBtn = document.createElement("button");
       editBtn.type = "button";
       editBtn.className = "icon-btn";
-      editBtn.setAttribute("aria-label", dish.name + " bearbeiten");
       editBtn.textContent = "✎";
-      editBtn.addEventListener("click", function (event) {
-        event.stopPropagation();
+      editBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
         openDishEdit(dish.id);
       });
 
       const deleteBtn = document.createElement("button");
       deleteBtn.type = "button";
       deleteBtn.className = "icon-btn";
-      deleteBtn.setAttribute("aria-label", dish.name + " löschen");
       deleteBtn.textContent = "✕";
-      deleteBtn.addEventListener("click", function (event) {
-        event.stopPropagation();
-        if (confirm('Gericht "' + dish.name + '" wirklich löschen?')) {
-          deleteDish(dish.id);
-        }
+      deleteBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (confirm('Gericht "' + dish.name + '" wirklich löschen?')) deleteDish(dish.id);
       });
 
       row.appendChild(info);
       row.appendChild(editBtn);
       row.appendChild(deleteBtn);
-      row.addEventListener("click", function (event) {
-        if (event.target === deleteBtn || event.target === editBtn) return;
+      row.addEventListener("click", function (e) {
+        if (e.target === deleteBtn || e.target === editBtn) return;
         openDishDetail(dish.id);
       });
-      row.addEventListener("keydown", function (event) {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
+      row.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
           openDishDetail(dish.id);
         }
       });
-
       els.dishList.appendChild(row);
     });
+  }
+
+  function openDishAddModal() {
+    els.addDishForm.reset();
+    els.dishAddOverlay.classList.remove("hidden");
+  }
+
+  function closeDishAddModal() {
+    els.dishAddOverlay.classList.add("hidden");
+    els.addDishForm.reset();
   }
 
   function openDishDetail(dishId) {
     const dish = findDishById(dishId);
     if (!dish) return;
-
     selectedDishId = dishId;
     els.dishDetailTitle.textContent = dish.name;
+    els.dishDetailMeta.textContent = dishCategoryLabel(dish);
     els.dishDetailIngredients.innerHTML = "";
-
     if (dish.ingredients.length === 0) {
       const li = document.createElement("li");
       li.textContent = "Keine Zutaten eingetragen";
       els.dishDetailIngredients.appendChild(li);
     } else {
-      dish.ingredients.forEach(function (ingredient) {
+      dish.ingredients.forEach(function (ing) {
         const li = document.createElement("li");
-        li.textContent = ingredient;
+        li.textContent = ing;
         els.dishDetailIngredients.appendChild(li);
       });
     }
-
     els.dishDetailOverlay.classList.remove("hidden");
   }
 
@@ -671,10 +764,11 @@
   function openDishEdit(dishId) {
     const dish = findDishById(dishId);
     if (!dish) return;
-
     selectedDishId = dishId;
     els.editDishName.value = dish.name;
     els.editDishIngredients.value = dish.ingredients.join("\n");
+    setRadioValue("edit-dish-diet", dish.diet);
+    setRadioValue("edit-dish-temp", dish.temp);
     els.dishDetailOverlay.classList.add("hidden");
     els.dishEditOverlay.classList.remove("hidden");
   }
@@ -685,73 +779,37 @@
     selectedDishId = null;
   }
 
-  function handleEditDish(event) {
-    event.preventDefault();
-
-    if (!roomRef) {
-      showToast("Bitte zuerst der Gruppe beitreten");
-      return;
-    }
-
-    if (!selectedDishId) return;
-
-    const name = els.editDishName.value;
-    const ingredients = els.editDishIngredients.value;
-
-    if (!normalizeName(name)) {
-      showToast("Bitte einen Gerichtnamen eingeben");
-      return;
-    }
-
-    const dish = updateDish(selectedDishId, name, ingredients);
-    if (!dish) return;
-
-    closeDishEditModal();
-    renderDishes();
-    if (activeView === "mealplan") renderMealPlan();
-    showToast('Gericht "' + dish.name + '" aktualisiert');
-  }
-
   function openDayPicker() {
     const dish = findDishById(selectedDishId);
     if (!dish) return;
-
     const weekStart = getWeekStart(weekOffset);
     const weekKey = weekPlanKey(weekStart);
-
     els.dayPickerHint.textContent = '"' + dish.name + '" – an welchem Tag?';
     els.dayPickerList.innerHTML = "";
 
     DAYS.forEach(function (day, index) {
       const date = new Date(weekStart);
       date.setDate(date.getDate() + index);
-
       const entry = getDayEntry(weekKey, day.key);
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "day-picker-btn";
-
       const label = document.createElement("span");
       label.textContent = day.label;
       const dateLabel = document.createElement("span");
       dateLabel.className = "day-date";
       dateLabel.textContent = formatDate(date);
-
       const current = document.createElement("span");
       current.className = "day-picker-current";
-      current.textContent = entry.dishName ? entry.dishName : "Frei";
-
+      current.textContent = entry.dishName || "Frei";
       btn.appendChild(label);
       btn.appendChild(dateLabel);
       btn.appendChild(current);
-
       btn.addEventListener("click", function () {
         assignDishToDay(dish, weekKey, day.key, day.label);
       });
-
       els.dayPickerList.appendChild(btn);
     });
-
     els.dayPickerOverlay.classList.remove("hidden");
   }
 
@@ -761,15 +819,16 @@
 
   function assignDishToDay(dish, weekKey, dayKey, dayLabel) {
     if (!mealPlan[weekKey]) mealPlan[weekKey] = {};
-    mealPlan[weekKey][dayKey] = {
-      dishId: dish.id,
-      dishName: dish.name,
-    };
+    mealPlan[weekKey][dayKey] = { dishId: dish.id, dishName: dish.name };
+    const added = syncDishIngredientsToWeeklyList(dish, weekKey);
     persistAll();
     closeDayPickerModal();
     closeDishDetailModal();
-    showToast(dish.name + " für " + dayLabel + " eingeplant");
+    let msg = dish.name + " für " + dayLabel + " eingeplant";
+    if (added > 0) msg += " – " + added + " Zutat(en) auf Wochen-Einkauf";
+    showToast(msg);
     if (activeView === "mealplan") renderMealPlan();
+    if (activeView === "shopping") renderShoppingList();
   }
 
   function clearDayEntry(weekKey, dayKey) {
@@ -780,27 +839,6 @@
     showToast("Tag geleert");
   }
 
-  function getWeekStart(offset) {
-    const now = new Date();
-    const day = now.getDay();
-    const diffToMonday = day === 0 ? -6 : 1 - day;
-    const monday = new Date(now);
-    monday.setHours(0, 0, 0, 0);
-    monday.setDate(monday.getDate() + diffToMonday + offset * 7);
-    return monday;
-  }
-
-  function formatDate(date) {
-    return date.toLocaleDateString("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-    });
-  }
-
-  function weekPlanKey(weekStart) {
-    return weekStart.toISOString().slice(0, 10);
-  }
-
   function getDayEntry(weekKey, dayKey) {
     if (!mealPlan[weekKey]) mealPlan[weekKey] = {};
     mealPlan[weekKey][dayKey] = migrateMealPlanEntry(mealPlan[weekKey][dayKey]);
@@ -809,34 +847,18 @@
 
   function renderMealPlan() {
     const weekStart = getWeekStart(weekOffset);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-
+    els.weekLabel.textContent = getWeekLabelText();
     const weekKey = weekPlanKey(weekStart);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
-    if (weekOffset === 0) {
-      els.weekLabel.textContent = "Diese Woche";
-    } else if (weekOffset === 1) {
-      els.weekLabel.textContent = "Nächste Woche";
-    } else if (weekOffset === -1) {
-      els.weekLabel.textContent = "Letzte Woche";
-    } else {
-      els.weekLabel.textContent = formatDate(weekStart) + " – " + formatDate(weekEnd);
-    }
-
     els.mealPlanEl.innerHTML = "";
 
     DAYS.forEach(function (day, index) {
       const date = new Date(weekStart);
       date.setDate(date.getDate() + index);
-
       const card = document.createElement("article");
       card.className = "day-card";
-      if (date.getTime() === today.getTime()) {
-        card.classList.add("is-today");
-      }
+      if (date.getTime() === today.getTime()) card.classList.add("is-today");
 
       const header = document.createElement("div");
       header.className = "day-header";
@@ -858,7 +880,6 @@
         dishName.className = "day-dish-name";
         dishName.textContent = entry.dishName;
         dishBox.appendChild(dishName);
-
         const dish = entry.dishId ? findDishById(entry.dishId) : null;
         if (dish && dish.ingredients.length > 0) {
           const ingredients = document.createElement("div");
@@ -866,7 +887,6 @@
           ingredients.textContent = dish.ingredients.join(", ");
           dishBox.appendChild(ingredients);
         }
-
         const clearBtn = document.createElement("button");
         clearBtn.type = "button";
         clearBtn.className = "btn btn-secondary btn-small";
@@ -881,7 +901,6 @@
         empty.textContent = "Kein Gericht geplant";
         dishBox.appendChild(empty);
       }
-
       card.appendChild(dishBox);
       els.mealPlanEl.appendChild(card);
     });
@@ -909,22 +928,16 @@
   function switchView(viewName) {
     activeView = viewName;
     closeMenu();
-
-    document.querySelectorAll(".view").forEach(function (view) {
-      view.classList.remove("active");
+    document.querySelectorAll(".view").forEach(function (v) {
+      v.classList.remove("active");
     });
     document.getElementById("view-" + viewName).classList.add("active");
-
     document.querySelectorAll(".menu-btn").forEach(function (btn) {
-      const isActive = btn.dataset.view === viewName;
-      btn.classList.toggle("active", isActive);
-      if (isActive) {
-        btn.setAttribute("aria-current", "page");
-      } else {
-        btn.removeAttribute("aria-current");
-      }
+      const active = btn.dataset.view === viewName;
+      btn.classList.toggle("active", active);
+      if (active) btn.setAttribute("aria-current", "page");
+      else btn.removeAttribute("aria-current");
     });
-
     els.pageTitle.textContent = VIEW_META[viewName].title;
     renderActiveView();
   }
@@ -932,129 +945,162 @@
   function handleAddFood(addToList) {
     const name = els.newFoodName.value;
     const category = els.newFoodCategory.value;
-
     if (!normalizeName(name)) {
       showToast("Bitte einen Namen eingeben");
       return;
     }
-
     const food = addFoodToDatabase(name, category);
     els.newFoodName.value = "";
     renderFoods();
-
-    if (addToList) {
-      addToShoppingList(food);
-    } else {
-      showToast(food.name + " in Datenbank gespeichert");
-    }
+    if (addToList) addToGeneralShoppingList(food);
+    else showToast(food.name + " in Datenbank gespeichert");
   }
 
   function handleAddDish(event) {
     event.preventDefault();
-
     if (!roomRef) {
       showToast("Bitte zuerst der Gruppe beitreten");
       return;
     }
-
     const name = els.newDishName.value;
     const ingredients = els.newDishIngredients.value;
-
+    const diet = getRadioValue("new-dish-diet");
+    const temp = getRadioValue("new-dish-temp");
     if (!normalizeName(name)) {
       showToast("Bitte einen Gerichtnamen eingeben");
       return;
     }
-
-    const dish = addDish(name, ingredients);
-    els.newDishName.value = "";
-    els.newDishIngredients.value = "";
+    if (!diet || !temp) {
+      showToast("Bitte Art und Temperatur wählen");
+      return;
+    }
+    const dish = addDish(name, ingredients, diet, temp);
+    closeDishAddModal();
     renderDishes();
     showToast('Gericht "' + dish.name + '" gespeichert');
+  }
+
+  function handleEditDish(event) {
+    event.preventDefault();
+    if (!roomRef || !selectedDishId) return;
+    const name = els.editDishName.value;
+    const ingredients = els.editDishIngredients.value;
+    const diet = getRadioValue("edit-dish-diet");
+    const temp = getRadioValue("edit-dish-temp");
+    if (!normalizeName(name) || !diet || !temp) {
+      showToast("Bitte alle Felder ausfüllen");
+      return;
+    }
+    const dish = updateDish(selectedDishId, name, ingredients, diet, temp);
+    if (!dish) return;
+    closeDishEditModal();
+    renderDishes();
+    if (activeView === "mealplan") renderMealPlan();
+    showToast('Gericht "' + dish.name + '" aktualisiert');
   }
 
   async function shareAppLink() {
     const url = getShareUrl();
     try {
       if (navigator.share) {
-        await navigator.share({
-          title: "Einkaufs-App",
-          text: "Tritt unserer gemeinsamen Einkaufsliste bei:",
-          url: url,
-        });
+        await navigator.share({ title: "Einkaufs-App", text: "Tritt unserer gemeinsamen Einkaufsliste bei:", url: url });
         return;
       }
-    } catch (error) {
-      if (error && error.name === "AbortError") return;
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
     }
-
     try {
       await navigator.clipboard.writeText(url);
-      showToast("Link kopiert – an deinen Bruder schicken!");
+      showToast("Link kopiert!");
     } catch {
-      prompt("Link kopieren und per WhatsApp schicken:", url);
+      prompt("Link kopieren:", url);
     }
   }
 
   function bindEvents() {
     els.menuToggle.addEventListener("click", function () {
-      if (els.sideMenu.classList.contains("open")) {
-        closeMenu();
-      } else {
-        openMenu();
-      }
+      if (els.sideMenu.classList.contains("open")) closeMenu();
+      else openMenu();
     });
-
     els.sideMenuOverlay.addEventListener("click", closeMenu);
-
     document.querySelectorAll(".menu-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
         switchView(btn.dataset.view);
       });
     });
 
-    els.addFoodForm.addEventListener("submit", function (event) {
-      event.preventDefault();
-      handleAddFood(true);
+    document.querySelectorAll(".filter-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const type = btn.dataset.filter;
+        const value = btn.dataset.value;
+        dishFilter[type] = dishFilter[type] === value ? null : value;
+        renderDishes();
+      });
     });
 
+    els.openAddDishBtn.addEventListener("click", openDishAddModal);
+    els.closeDishAdd.addEventListener("click", closeDishAddModal);
+    els.dishAddOverlay.addEventListener("click", function (e) {
+      if (e.target === els.dishAddOverlay) closeDishAddModal();
+    });
+    els.addDishForm.addEventListener("submit", handleAddDish);
+
+    els.addFoodForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      handleAddFood(true);
+    });
     els.saveFoodOnly.addEventListener("click", function () {
       handleAddFood(false);
     });
-
-    els.addDishForm.addEventListener("submit", handleAddDish);
-
     els.foodSearch.addEventListener("input", renderFoods);
     els.dishSearch.addEventListener("input", renderDishes);
 
-    document.getElementById("clear-checked").addEventListener("click", function () {
-      shoppingList = shoppingList.filter(function (item) {
-        return !item.checked;
+    document.getElementById("clear-checked-general").addEventListener("click", function () {
+      shoppingList = shoppingList.filter(function (i) {
+        return i.checked;
       });
       persistAll();
       renderShoppingList();
-      showToast("Erledigte Artikel entfernt");
+      showToast("Erledigte entfernt");
     });
-
-    document.getElementById("clear-all").addEventListener("click", function () {
-      if (shoppingList.length === 0) return;
-      if (confirm("Gesamte Einkaufsliste leeren?")) {
+    document.getElementById("clear-all-general").addEventListener("click", function () {
+      if (!shoppingList.length) return;
+      if (confirm("Allgemeine Liste leeren?")) {
         shoppingList = [];
         persistAll();
         renderShoppingList();
-        showToast("Einkaufsliste geleert");
+      }
+    });
+    document.getElementById("clear-checked-weekly").addEventListener("click", function () {
+      const weekKey = weekPlanKey(getWeekStart(weekOffset));
+      weeklyShopping[weekKey] = getWeeklyList(weekKey).filter(function (i) {
+        return i.checked;
+      });
+      persistAll();
+      renderShoppingList();
+      showToast("Erledigte entfernt");
+    });
+    document.getElementById("clear-all-weekly").addEventListener("click", function () {
+      const weekKey = weekPlanKey(getWeekStart(weekOffset));
+      if (!getWeeklyList(weekKey).length) return;
+      if (confirm("Wochen-Einkauf leeren?")) {
+        weeklyShopping[weekKey] = [];
+        persistAll();
+        renderShoppingList();
       }
     });
 
-    document.getElementById("prev-week").addEventListener("click", function () {
-      weekOffset -= 1;
-      persistAll();
-      renderMealPlan();
+    document.getElementById("prev-week-shopping").addEventListener("click", function () {
+      changeWeekOffset(-1);
     });
-
+    document.getElementById("next-week-shopping").addEventListener("click", function () {
+      changeWeekOffset(1);
+    });
+    document.getElementById("prev-week").addEventListener("click", function () {
+      changeWeekOffset(-1);
+    });
     document.getElementById("next-week").addEventListener("click", function () {
-      weekOffset += 1;
-      persistAll();
-      renderMealPlan();
+      changeWeekOffset(1);
     });
 
     els.closeDishDetail.addEventListener("click", closeDishDetailModal);
@@ -1065,61 +1111,46 @@
     els.closeDishEdit.addEventListener("click", closeDishEditModal);
     els.cancelDishEdit.addEventListener("click", closeDishEditModal);
     els.editDishForm.addEventListener("submit", handleEditDish);
-
-    els.dishDetailOverlay.addEventListener("click", function (event) {
-      if (event.target === els.dishDetailOverlay) closeDishDetailModal();
+    els.dishDetailOverlay.addEventListener("click", function (e) {
+      if (e.target === els.dishDetailOverlay) closeDishDetailModal();
     });
-
-    els.dishEditOverlay.addEventListener("click", function (event) {
-      if (event.target === els.dishEditOverlay) closeDishEditModal();
+    els.dishEditOverlay.addEventListener("click", function (e) {
+      if (e.target === els.dishEditOverlay) closeDishEditModal();
     });
-
     els.closeDayPicker.addEventListener("click", closeDayPickerModal);
-
-    els.dayPickerOverlay.addEventListener("click", function (event) {
-      if (event.target === els.dayPickerOverlay) closeDayPickerModal();
+    els.dayPickerOverlay.addEventListener("click", function (e) {
+      if (e.target === els.dayPickerOverlay) closeDayPickerModal();
     });
 
     els.joinRoomBtn.addEventListener("click", function () {
       connectToRoom(els.roomCodeInput.value);
     });
-
     els.createRoomBtn.addEventListener("click", function () {
       els.roomCodeInput.value = generateRoomCode();
     });
-
     els.shareLinkBtn.addEventListener("click", shareAppLink);
   }
 
   function startApp() {
     bindEvents();
     switchView("shopping");
-
     if (!initFirebase()) {
       showSetupOverlay(window.DEFAULT_GROUP_CODE || "FAMILIE");
       return;
     }
-
     const urlRoom = getRoomFromUrl();
     const storedRoom = getStoredRoom();
     const defaultRoom = window.DEFAULT_GROUP_CODE || "FAMILIE";
-
-    if (urlRoom) {
-      connectToRoom(urlRoom);
-      return;
-    }
-
-    if (storedRoom) {
-      connectToRoom(storedRoom);
-      return;
-    }
-
-    showSetupOverlay(defaultRoom);
+    if (urlRoom) connectToRoom(urlRoom);
+    else if (storedRoom) connectToRoom(storedRoom);
+    else showSetupOverlay(defaultRoom);
   }
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js").catch(function () {});
+      navigator.serviceWorker.register("sw.js").then(function (r) {
+        r.update();
+      }).catch(function () {});
     });
   }
 

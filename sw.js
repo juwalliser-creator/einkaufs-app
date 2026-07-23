@@ -1,57 +1,30 @@
-const CACHE_NAME = "einkaufs-app-v6";
-const ASSETS = [
-  "./",
-  "./index.html",
-  "./css/style.css",
-  "./manifest.json",
-  "./icons/icon.svg",
-];
+const CACHE_NAME = "einkaufs-app-v8";
 
 self.addEventListener("install", function (event) {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(function (cache) {
-      return cache.addAll(ASSETS);
-    })
-  );
   self.skipWaiting();
 });
 
 self.addEventListener("activate", function (event) {
   event.waitUntil(
     caches.keys().then(function (keys) {
-      return Promise.all(
-        keys
-          .filter(function (key) {
-            return key !== CACHE_NAME;
-          })
-          .map(function (key) {
-            return caches.delete(key);
-          })
-      );
+      return Promise.all(keys.map(function (key) {
+        return caches.delete(key);
+      }));
+    }).then(function () {
+      return self.clients.claim();
     })
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", function (event) {
-  const url = new URL(event.request.url);
-  const alwaysFresh =
-    url.pathname.includes("/js/") ||
-    url.pathname.endsWith("/index.html") ||
-    url.pathname.endsWith("/");
+  if (event.request.method !== "GET") return;
 
-  if (alwaysFresh) {
-    event.respondWith(
-      fetch(event.request).catch(function () {
-        return caches.match(event.request);
-      })
-    );
-    return;
-  }
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    caches.match(event.request).then(function (cached) {
-      return cached || fetch(event.request);
+    fetch(event.request).catch(function () {
+      return caches.match(event.request);
     })
   );
 });

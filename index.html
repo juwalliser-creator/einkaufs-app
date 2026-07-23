@@ -16,12 +16,36 @@
 <body>
   <header class="app-header">
     <div class="header-top">
-      <div>
-        <h1 id="page-title">Einkaufsliste</h1>
-      </div>
+      <button type="button" class="btn-hamburger" id="menu-toggle" aria-label="Menü öffnen" aria-expanded="false">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <h1 id="page-title">Einkaufsliste</h1>
       <button type="button" class="btn btn-header" id="share-link-btn" title="Link teilen">Link teilen</button>
     </div>
   </header>
+
+  <div id="side-menu-overlay" class="side-menu-overlay hidden"></div>
+  <nav id="side-menu" class="side-menu" aria-label="Hauptnavigation">
+    <p class="side-menu-title">Menü</p>
+    <button type="button" class="menu-btn active" data-view="shopping" aria-current="page">
+      <span class="menu-icon" aria-hidden="true">🛒</span>
+      <span>Liste</span>
+    </button>
+    <button type="button" class="menu-btn" data-view="foods">
+      <span class="menu-icon" aria-hidden="true">🥬</span>
+      <span>Lebensmittel</span>
+    </button>
+    <button type="button" class="menu-btn" data-view="dishes">
+      <span class="menu-icon" aria-hidden="true">🍽️</span>
+      <span>Gerichte</span>
+    </button>
+    <button type="button" class="menu-btn" data-view="mealplan">
+      <span class="menu-icon" aria-hidden="true">📅</span>
+      <span>Wochenplan</span>
+    </button>
+  </nav>
 
   <div id="setup-overlay" class="setup-overlay hidden">
     <div class="setup-card card">
@@ -109,25 +133,6 @@
       <div id="meal-plan" class="meal-plan"></div>
     </section>
   </main>
-
-  <nav class="bottom-nav" aria-label="Hauptnavigation">
-    <button type="button" class="nav-btn active" data-view="shopping" aria-current="page">
-      <span class="nav-icon" aria-hidden="true">🛒</span>
-      <span>Liste</span>
-    </button>
-    <button type="button" class="nav-btn" data-view="foods">
-      <span class="nav-icon" aria-hidden="true">🥬</span>
-      <span>Lebensmittel</span>
-    </button>
-    <button type="button" class="nav-btn" data-view="dishes">
-      <span class="nav-icon" aria-hidden="true">🍽️</span>
-      <span>Gerichte</span>
-    </button>
-    <button type="button" class="nav-btn" data-view="mealplan">
-      <span class="nav-icon" aria-hidden="true">📅</span>
-      <span>Wochenplan</span>
-    </button>
-  </nav>
 
   <div id="dish-detail-overlay" class="modal-overlay hidden">
     <div class="modal-card card">

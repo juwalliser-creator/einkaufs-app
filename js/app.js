@@ -59,6 +59,7 @@
   let isRemoteUpdate = false;
   let isInitialized = false;
   let toastTimer = null;
+  let pendingWrites = 0;
   let activeView = "shopping";
   let selectedDishId = null;
 
@@ -75,6 +76,9 @@
     joinRoomBtn: document.getElementById("join-room-btn"),
     createRoomBtn: document.getElementById("create-room-btn"),
     shareLinkBtn: document.getElementById("share-link-btn"),
+    menuToggle: document.getElementById("menu-toggle"),
+    sideMenu: document.getElementById("side-menu"),
+    sideMenuOverlay: document.getElementById("side-menu-overlay"),
     shoppingList: document.getElementById("shopping-list"),
     shoppingEmpty: document.getElementById("shopping-empty"),
     foodGroups: document.getElementById("food-groups"),
@@ -222,11 +226,11 @@
 
   function applyRemoteData(data) {
     isRemoteUpdate = true;
-    foods = Array.isArray(data.foods) ? data.foods : [];
-    dishes = Array.isArray(data.dishes) ? data.dishes : [];
-    shoppingList = Array.isArray(data.shopping) ? data.shopping : [];
-    mealPlan = data.mealPlan && typeof data.mealPlan === "object" ? data.mealPlan : {};
-    weekOffset = typeof data.weekOffset === "number" ? data.weekOffset : 0;
+    if (Array.isArray(data.foods)) foods = data.foods;
+    if (Array.isArray(data.dishes)) dishes = data.dishes;
+    if (Array.isArray(data.shopping)) shoppingList = data.shopping;
+    if (data.mealPlan && typeof data.mealPlan === "object") mealPlan = data.mealPlan;
+    if (typeof data.weekOffset === "number") weekOffset = data.weekOffset;
     isRemoteUpdate = false;
     isInitialized = true;
     renderActiveView();
@@ -256,6 +260,8 @@
 
     unsubscribeRoom = roomRef.onSnapshot(
       function (snapshot) {
+        if (pendingWrites > 0) return;
+
         if (!snapshot.exists) {
           if (!isInitialized) {
             foods = createDefaultFoods();
@@ -282,6 +288,7 @@
   function persistAll() {
     if (isRemoteUpdate || !roomRef) return;
 
+    pendingWrites += 1;
     roomRef.set(
       {
         foods: foods,
@@ -295,6 +302,10 @@
     ).catch(function (error) {
       console.error(error);
       showToast("Konnte nicht speichern");
+    }).finally(function () {
+      setTimeout(function () {
+        pendingWrites -= 1;
+      }, 400);
     });
   }
 
@@ -539,9 +550,10 @@
     els.dishesEmpty.classList.add("hidden");
 
     filtered.forEach(function (dish) {
-      const row = document.createElement("button");
-      row.type = "button";
+      const row = document.createElement("div");
       row.className = "dish-row";
+      row.tabIndex = 0;
+      row.setAttribute("role", "button");
 
       const info = document.createElement("div");
       info.className = "dish-row-info";
@@ -568,8 +580,15 @@
 
       row.appendChild(info);
       row.appendChild(deleteBtn);
-      row.addEventListener("click", function () {
+      row.addEventListener("click", function (event) {
+        if (event.target === deleteBtn) return;
         openDishDetail(dish.id);
+      });
+      row.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openDishDetail(dish.id);
+        }
       });
 
       els.dishList.appendChild(row);
@@ -786,15 +805,28 @@
     if (activeView === "mealplan") renderMealPlan();
   }
 
+  function openMenu() {
+    els.sideMenu.classList.add("open");
+    els.sideMenuOverlay.classList.remove("hidden");
+    els.menuToggle.setAttribute("aria-expanded", "true");
+  }
+
+  function closeMenu() {
+    els.sideMenu.classList.remove("open");
+    els.sideMenuOverlay.classList.add("hidden");
+    els.menuToggle.setAttribute("aria-expanded", "false");
+  }
+
   function switchView(viewName) {
     activeView = viewName;
+    closeMenu();
 
     document.querySelectorAll(".view").forEach(function (view) {
       view.classList.remove("active");
     });
     document.getElementById("view-" + viewName).classList.add("active");
 
-    document.querySelectorAll(".nav-btn").forEach(function (btn) {
+    document.querySelectorAll(".menu-btn").forEach(function (btn) {
       const isActive = btn.dataset.view === viewName;
       btn.classList.toggle("active", isActive);
       if (isActive) {
@@ -830,6 +862,12 @@
 
   function handleAddDish(event) {
     event.preventDefault();
+
+    if (!roomRef) {
+      showToast("Bitte zuerst der Gruppe beitreten");
+      return;
+    }
+
     const name = els.newDishName.value;
     const ingredients = els.newDishIngredients.value;
 
@@ -869,7 +907,17 @@
   }
 
   function bindEvents() {
-    document.querySelectorAll(".nav-btn").forEach(function (btn) {
+    els.menuToggle.addEventListener("click", function () {
+      if (els.sideMenu.classList.contains("open")) {
+        closeMenu();
+      } else {
+        openMenu();
+      }
+    });
+
+    els.sideMenuOverlay.addEventListener("click", closeMenu);
+
+    document.querySelectorAll(".menu-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
         switchView(btn.dataset.view);
       });

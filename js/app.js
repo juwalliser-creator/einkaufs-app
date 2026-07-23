@@ -93,7 +93,6 @@
     addFoodForm: document.getElementById("add-food-form"),
     newFoodName: document.getElementById("new-food-name"),
     newFoodCategory: document.getElementById("new-food-category"),
-    saveFoodOnly: document.getElementById("save-food-only"),
     openAddDishBtn: document.getElementById("open-add-dish-btn"),
     dishAddOverlay: document.getElementById("dish-add-overlay"),
     closeDishAdd: document.getElementById("close-dish-add"),
@@ -918,7 +917,8 @@
     renderActiveView();
   }
 
-  function handleAddFood(addToList) {
+  function handleAddFood(event) {
+    event.preventDefault();
     const name = els.newFoodName.value;
     const category = els.newFoodCategory.value;
     if (!normalizeName(name)) {
@@ -928,8 +928,7 @@
     const food = addFoodToDatabase(name, category);
     els.newFoodName.value = "";
     renderFoods();
-    if (addToList) addFoodToWeeklyList(food);
-    else showToast(food.name + " in Datenbank gespeichert");
+    showToast(food.name + " in Datenbank gespeichert");
   }
 
   function handleAddDish(event) {
@@ -1021,13 +1020,7 @@
     });
     els.addDishForm.addEventListener("submit", handleAddDish);
 
-    els.addFoodForm.addEventListener("submit", function (e) {
-      e.preventDefault();
-      handleAddFood(true);
-    });
-    els.saveFoodOnly.addEventListener("click", function () {
-      handleAddFood(false);
-    });
+    els.addFoodForm.addEventListener("submit", handleAddFood);
     els.foodSearch.addEventListener("input", renderFoods);
     els.dishSearch.addEventListener("input", renderDishes);
 

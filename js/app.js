@@ -2,7 +2,6 @@
   "use strict";
 
   const ROOM_STORAGE_KEY = "einkaufsapp_room";
-  const MEAL_PLAN_DEBOUNCE_MS = 450;
 
   const DAYS = [
     { key: "monday", label: "Montag" },
@@ -12,12 +11,6 @@
     { key: "friday", label: "Freitag" },
     { key: "saturday", label: "Samstag" },
     { key: "sunday", label: "Sonntag" },
-  ];
-
-  const MEALS = [
-    { key: "breakfast", label: "Frühstück" },
-    { key: "lunch", label: "Mittagessen" },
-    { key: "dinner", label: "Abendessen" },
   ];
 
   const DEFAULT_FOODS = [
@@ -55,6 +48,7 @@
   const VIEW_META = {
     shopping: { title: "Einkaufsliste" },
     foods: { title: "Lebensmittel" },
+    dishes: { title: "Gerichte" },
     mealplan: { title: "Wochenplan" },
   };
 
@@ -64,11 +58,12 @@
   let unsubscribeRoom = null;
   let isRemoteUpdate = false;
   let isInitialized = false;
-  let mealPlanTimer = null;
   let toastTimer = null;
   let activeView = "shopping";
+  let selectedDishId = null;
 
   let foods = [];
+  let dishes = [];
   let shoppingList = [];
   let mealPlan = {};
   let weekOffset = 0;
@@ -89,6 +84,21 @@
     newFoodName: document.getElementById("new-food-name"),
     newFoodCategory: document.getElementById("new-food-category"),
     saveFoodOnly: document.getElementById("save-food-only"),
+    addDishForm: document.getElementById("add-dish-form"),
+    newDishName: document.getElementById("new-dish-name"),
+    newDishIngredients: document.getElementById("new-dish-ingredients"),
+    dishSearch: document.getElementById("dish-search"),
+    dishList: document.getElementById("dish-list"),
+    dishesEmpty: document.getElementById("dishes-empty"),
+    dishDetailOverlay: document.getElementById("dish-detail-overlay"),
+    dishDetailTitle: document.getElementById("dish-detail-title"),
+    dishDetailIngredients: document.getElementById("dish-detail-ingredients"),
+    closeDishDetail: document.getElementById("close-dish-detail"),
+    addDishToPlanBtn: document.getElementById("add-dish-to-plan-btn"),
+    dayPickerOverlay: document.getElementById("day-picker-overlay"),
+    dayPickerHint: document.getElementById("day-picker-hint"),
+    dayPickerList: document.getElementById("day-picker-list"),
+    closeDayPicker: document.getElementById("close-day-picker"),
     mealPlanEl: document.getElementById("meal-plan"),
     weekLabel: document.getElementById("week-label"),
     toast: document.getElementById("toast"),
@@ -115,15 +125,22 @@
     return code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 32);
   }
 
+  function parseIngredients(text) {
+    return text
+      .split("\n")
+      .map(function (line) {
+        return normalizeName(line);
+      })
+      .filter(Boolean);
+  }
+
   function createDefaultFoods() {
     return DEFAULT_FOODS.map(function (item) {
       return { id: uid(), name: item.name, category: item.category };
     });
   }
 
-  function setSyncStatus() {
-    /* Sync-Status wird nicht mehr im Header angezeigt */
-  }
+  function setSyncStatus() {}
 
   function firebaseConfigured() {
     const config = window.FIREBASE_CONFIG || {};
@@ -178,7 +195,6 @@
 
   function initFirebase() {
     if (!firebaseConfigured()) {
-      setSyncStatus("Firebase nicht eingerichtet – siehe FIREBASE-SETUP.md", "error");
       showSetupOverlay(window.DEFAULT_GROUP_CODE || "FAMILIE");
       return false;
     }
@@ -190,9 +206,24 @@
     return true;
   }
 
+  function migrateMealPlanEntry(entry) {
+    if (!entry || typeof entry !== "object") {
+      return { dishId: "", dishName: "" };
+    }
+    if (entry.dishId !== undefined || entry.dishName !== undefined) {
+      return {
+        dishId: entry.dishId || "",
+        dishName: entry.dishName || "",
+      };
+    }
+    const legacyName = entry.lunch || entry.dinner || entry.breakfast || "";
+    return { dishId: "", dishName: legacyName };
+  }
+
   function applyRemoteData(data) {
     isRemoteUpdate = true;
     foods = Array.isArray(data.foods) ? data.foods : [];
+    dishes = Array.isArray(data.dishes) ? data.dishes : [];
     shoppingList = Array.isArray(data.shopping) ? data.shopping : [];
     mealPlan = data.mealPlan && typeof data.mealPlan === "object" ? data.mealPlan : {};
     weekOffset = typeof data.weekOffset === "number" ? data.weekOffset : 0;
@@ -220,7 +251,6 @@
 
     saveRoom(normalized);
     hideSetupOverlay();
-    setSyncStatus("Verbinde mit Gruppe " + roomCode + "…", "");
 
     roomRef = db.collection("rooms").doc(roomCode);
 
@@ -229,6 +259,7 @@
         if (!snapshot.exists) {
           if (!isInitialized) {
             foods = createDefaultFoods();
+            dishes = [];
             shoppingList = [];
             mealPlan = {};
             weekOffset = 0;
@@ -236,16 +267,13 @@
             persistAll();
             renderActiveView();
           }
-          setSyncStatus("Gruppe " + roomCode + " – verbunden", "online");
           return;
         }
 
         applyRemoteData(snapshot.data());
-        setSyncStatus("Gruppe " + roomCode + " – live synchronisiert", "online");
       },
       function (error) {
         console.error(error);
-        setSyncStatus("Verbindungsfehler – Internet prüfen", "error");
         showToast("Sync-Fehler: " + error.message);
       }
     );
@@ -257,6 +285,7 @@
     roomRef.set(
       {
         foods: foods,
+        dishes: dishes,
         shopping: shoppingList,
         mealPlan: mealPlan,
         weekOffset: weekOffset,
@@ -265,28 +294,20 @@
       { merge: true }
     ).catch(function (error) {
       console.error(error);
-      setSyncStatus("Speichern fehlgeschlagen", "error");
       showToast("Konnte nicht speichern");
     });
-  }
-
-  function persistFoods() {
-    persistAll();
-  }
-
-  function persistShopping() {
-    persistAll();
-  }
-
-  function persistMealPlanDebounced() {
-    clearTimeout(mealPlanTimer);
-    mealPlanTimer = setTimeout(persistAll, MEAL_PLAN_DEBOUNCE_MS);
   }
 
   function findFoodByName(name) {
     const normalized = normalizeName(name).toLowerCase();
     return foods.find(function (food) {
       return food.name.toLowerCase() === normalized;
+    });
+  }
+
+  function findDishById(id) {
+    return dishes.find(function (dish) {
+      return dish.id === id;
     });
   }
 
@@ -302,8 +323,48 @@
     foods.sort(function (a, b) {
       return a.name.localeCompare(b.name, "de");
     });
-    persistFoods();
+    persistAll();
     return food;
+  }
+
+  function addDish(name, ingredientsText) {
+    const cleanName = normalizeName(name);
+    if (!cleanName) return null;
+
+    const dish = {
+      id: uid(),
+      name: cleanName,
+      ingredients: parseIngredients(ingredientsText),
+    };
+    dishes.push(dish);
+    dishes.sort(function (a, b) {
+      return a.name.localeCompare(b.name, "de");
+    });
+    persistAll();
+    return dish;
+  }
+
+  function deleteDish(id) {
+    dishes = dishes.filter(function (dish) {
+      return dish.id !== id;
+    });
+
+    Object.keys(mealPlan).forEach(function (weekKey) {
+      DAYS.forEach(function (day) {
+        const entry = mealPlan[weekKey] && mealPlan[weekKey][day.key];
+        if (entry && entry.dishId === id) {
+          mealPlan[weekKey][day.key] = { dishId: "", dishName: "" };
+        }
+      });
+    });
+
+    persistAll();
+    if (selectedDishId === id) {
+      closeDishDetailModal();
+    }
+    renderDishes();
+    if (activeView === "mealplan") renderMealPlan();
+    showToast("Gericht gelöscht");
   }
 
   function addToShoppingList(food) {
@@ -323,7 +384,7 @@
       checked: false,
       addedAt: Date.now(),
     });
-    persistShopping();
+    persistAll();
     renderShoppingList();
     showToast(food.name + " zur Einkaufsliste hinzugefügt");
     return true;
@@ -333,7 +394,7 @@
     shoppingList = shoppingList.filter(function (item) {
       return item.id !== id;
     });
-    persistShopping();
+    persistAll();
     renderShoppingList();
   }
 
@@ -344,7 +405,7 @@
       }
       return item;
     });
-    persistShopping();
+    persistAll();
     renderShoppingList();
   }
 
@@ -446,7 +507,8 @@
         addBtn.className = "btn btn-add";
         addBtn.setAttribute("aria-label", food.name + " zur Liste hinzufügen");
         addBtn.textContent = "+";
-        addBtn.addEventListener("click", function () {
+        addBtn.addEventListener("click", function (event) {
+          event.stopPropagation();
           addToShoppingList(food);
         });
 
@@ -458,6 +520,156 @@
       section.appendChild(list);
       els.foodGroups.appendChild(section);
     });
+  }
+
+  function renderDishes() {
+    const query = els.dishSearch.value.trim().toLowerCase();
+    const filtered = dishes.filter(function (dish) {
+      const ingredientText = dish.ingredients.join(" ").toLowerCase();
+      return dish.name.toLowerCase().includes(query) || ingredientText.includes(query);
+    });
+
+    els.dishList.innerHTML = "";
+
+    if (filtered.length === 0) {
+      els.dishesEmpty.classList.remove("hidden");
+      return;
+    }
+
+    els.dishesEmpty.classList.add("hidden");
+
+    filtered.forEach(function (dish) {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "dish-row";
+
+      const info = document.createElement("div");
+      info.className = "dish-row-info";
+      const name = document.createElement("div");
+      name.className = "item-name";
+      name.textContent = dish.name;
+      const meta = document.createElement("div");
+      meta.className = "item-meta";
+      meta.textContent = dish.ingredients.length + " Zutat(en)";
+      info.appendChild(name);
+      info.appendChild(meta);
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.className = "icon-btn";
+      deleteBtn.setAttribute("aria-label", dish.name + " löschen");
+      deleteBtn.textContent = "✕";
+      deleteBtn.addEventListener("click", function (event) {
+        event.stopPropagation();
+        if (confirm('Gericht "' + dish.name + '" wirklich löschen?')) {
+          deleteDish(dish.id);
+        }
+      });
+
+      row.appendChild(info);
+      row.appendChild(deleteBtn);
+      row.addEventListener("click", function () {
+        openDishDetail(dish.id);
+      });
+
+      els.dishList.appendChild(row);
+    });
+  }
+
+  function openDishDetail(dishId) {
+    const dish = findDishById(dishId);
+    if (!dish) return;
+
+    selectedDishId = dishId;
+    els.dishDetailTitle.textContent = dish.name;
+    els.dishDetailIngredients.innerHTML = "";
+
+    if (dish.ingredients.length === 0) {
+      const li = document.createElement("li");
+      li.textContent = "Keine Zutaten eingetragen";
+      els.dishDetailIngredients.appendChild(li);
+    } else {
+      dish.ingredients.forEach(function (ingredient) {
+        const li = document.createElement("li");
+        li.textContent = ingredient;
+        els.dishDetailIngredients.appendChild(li);
+      });
+    }
+
+    els.dishDetailOverlay.classList.remove("hidden");
+  }
+
+  function closeDishDetailModal() {
+    els.dishDetailOverlay.classList.add("hidden");
+    selectedDishId = null;
+  }
+
+  function openDayPicker() {
+    const dish = findDishById(selectedDishId);
+    if (!dish) return;
+
+    const weekStart = getWeekStart(weekOffset);
+    const weekKey = weekPlanKey(weekStart);
+
+    els.dayPickerHint.textContent = '"' + dish.name + '" – an welchem Tag?';
+    els.dayPickerList.innerHTML = "";
+
+    DAYS.forEach(function (day, index) {
+      const date = new Date(weekStart);
+      date.setDate(date.getDate() + index);
+
+      const entry = getDayEntry(weekKey, day.key);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "day-picker-btn";
+
+      const label = document.createElement("span");
+      label.textContent = day.label;
+      const dateLabel = document.createElement("span");
+      dateLabel.className = "day-date";
+      dateLabel.textContent = formatDate(date);
+
+      const current = document.createElement("span");
+      current.className = "day-picker-current";
+      current.textContent = entry.dishName ? entry.dishName : "Frei";
+
+      btn.appendChild(label);
+      btn.appendChild(dateLabel);
+      btn.appendChild(current);
+
+      btn.addEventListener("click", function () {
+        assignDishToDay(dish, weekKey, day.key, day.label);
+      });
+
+      els.dayPickerList.appendChild(btn);
+    });
+
+    els.dayPickerOverlay.classList.remove("hidden");
+  }
+
+  function closeDayPickerModal() {
+    els.dayPickerOverlay.classList.add("hidden");
+  }
+
+  function assignDishToDay(dish, weekKey, dayKey, dayLabel) {
+    if (!mealPlan[weekKey]) mealPlan[weekKey] = {};
+    mealPlan[weekKey][dayKey] = {
+      dishId: dish.id,
+      dishName: dish.name,
+    };
+    persistAll();
+    closeDayPickerModal();
+    closeDishDetailModal();
+    showToast(dish.name + " für " + dayLabel + " eingeplant");
+    if (activeView === "mealplan") renderMealPlan();
+  }
+
+  function clearDayEntry(weekKey, dayKey) {
+    if (!mealPlan[weekKey]) return;
+    mealPlan[weekKey][dayKey] = { dishId: "", dishName: "" };
+    persistAll();
+    renderMealPlan();
+    showToast("Tag geleert");
   }
 
   function getWeekStart(offset) {
@@ -481,11 +693,9 @@
     return weekStart.toISOString().slice(0, 10);
   }
 
-  function getDayPlan(weekKey, dayKey) {
+  function getDayEntry(weekKey, dayKey) {
     if (!mealPlan[weekKey]) mealPlan[weekKey] = {};
-    if (!mealPlan[weekKey][dayKey]) {
-      mealPlan[weekKey][dayKey] = { breakfast: "", lunch: "", dinner: "" };
-    }
+    mealPlan[weekKey][dayKey] = migrateMealPlanEntry(mealPlan[weekKey][dayKey]);
     return mealPlan[weekKey][dayKey];
   }
 
@@ -531,30 +741,40 @@
       header.appendChild(dateLabel);
       card.appendChild(header);
 
-      const dayPlan = getDayPlan(weekKey, day.key);
+      const entry = getDayEntry(weekKey, day.key);
+      const dishBox = document.createElement("div");
+      dishBox.className = "day-dish";
 
-      MEALS.forEach(function (meal) {
-        const field = document.createElement("div");
-        field.className = "meal-field";
+      if (entry.dishName) {
+        const dishName = document.createElement("div");
+        dishName.className = "day-dish-name";
+        dishName.textContent = entry.dishName;
+        dishBox.appendChild(dishName);
 
-        const label = document.createElement("label");
-        label.textContent = meal.label;
-        label.setAttribute("for", weekKey + "-" + day.key + "-" + meal.key);
+        const dish = entry.dishId ? findDishById(entry.dishId) : null;
+        if (dish && dish.ingredients.length > 0) {
+          const ingredients = document.createElement("div");
+          ingredients.className = "day-dish-ingredients";
+          ingredients.textContent = dish.ingredients.join(", ");
+          dishBox.appendChild(ingredients);
+        }
 
-        const textarea = document.createElement("textarea");
-        textarea.id = weekKey + "-" + day.key + "-" + meal.key;
-        textarea.placeholder = "z.B. Pasta mit Tomatensauce";
-        textarea.value = dayPlan[meal.key] || "";
-        textarea.addEventListener("input", function () {
-          dayPlan[meal.key] = textarea.value;
-          persistMealPlanDebounced();
+        const clearBtn = document.createElement("button");
+        clearBtn.type = "button";
+        clearBtn.className = "btn btn-secondary btn-small";
+        clearBtn.textContent = "Entfernen";
+        clearBtn.addEventListener("click", function () {
+          clearDayEntry(weekKey, day.key);
         });
+        dishBox.appendChild(clearBtn);
+      } else {
+        const empty = document.createElement("div");
+        empty.className = "day-dish-empty";
+        empty.textContent = "Kein Gericht geplant";
+        dishBox.appendChild(empty);
+      }
 
-        field.appendChild(label);
-        field.appendChild(textarea);
-        card.appendChild(field);
-      });
-
+      card.appendChild(dishBox);
       els.mealPlanEl.appendChild(card);
     });
   }
@@ -562,6 +782,7 @@
   function renderActiveView() {
     if (activeView === "shopping") renderShoppingList();
     if (activeView === "foods") renderFoods();
+    if (activeView === "dishes") renderDishes();
     if (activeView === "mealplan") renderMealPlan();
   }
 
@@ -607,6 +828,23 @@
     }
   }
 
+  function handleAddDish(event) {
+    event.preventDefault();
+    const name = els.newDishName.value;
+    const ingredients = els.newDishIngredients.value;
+
+    if (!normalizeName(name)) {
+      showToast("Bitte einen Gerichtnamen eingeben");
+      return;
+    }
+
+    const dish = addDish(name, ingredients);
+    els.newDishName.value = "";
+    els.newDishIngredients.value = "";
+    renderDishes();
+    showToast('Gericht "' + dish.name + '" gespeichert');
+  }
+
   async function shareAppLink() {
     const url = getShareUrl();
     try {
@@ -646,13 +884,16 @@
       handleAddFood(false);
     });
 
+    els.addDishForm.addEventListener("submit", handleAddDish);
+
     els.foodSearch.addEventListener("input", renderFoods);
+    els.dishSearch.addEventListener("input", renderDishes);
 
     document.getElementById("clear-checked").addEventListener("click", function () {
       shoppingList = shoppingList.filter(function (item) {
         return !item.checked;
       });
-      persistShopping();
+      persistAll();
       renderShoppingList();
       showToast("Erledigte Artikel entfernt");
     });
@@ -661,7 +902,7 @@
       if (shoppingList.length === 0) return;
       if (confirm("Gesamte Einkaufsliste leeren?")) {
         shoppingList = [];
-        persistShopping();
+        persistAll();
         renderShoppingList();
         showToast("Einkaufsliste geleert");
       }
@@ -677,6 +918,18 @@
       weekOffset += 1;
       persistAll();
       renderMealPlan();
+    });
+
+    els.closeDishDetail.addEventListener("click", closeDishDetailModal);
+    els.addDishToPlanBtn.addEventListener("click", openDayPicker);
+    els.closeDayPicker.addEventListener("click", closeDayPickerModal);
+
+    els.dishDetailOverlay.addEventListener("click", function (event) {
+      if (event.target === els.dishDetailOverlay) closeDishDetailModal();
+    });
+
+    els.dayPickerOverlay.addEventListener("click", function (event) {
+      if (event.target === els.dayPickerOverlay) closeDayPickerModal();
     });
 
     els.joinRoomBtn.addEventListener("click", function () {
@@ -718,9 +971,7 @@
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js").catch(function () {
-        /* optional */
-      });
+      navigator.serviceWorker.register("sw.js").catch(function () {});
     });
   }
 

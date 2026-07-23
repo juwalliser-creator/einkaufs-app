@@ -77,6 +77,28 @@
       <p id="foods-empty" class="empty-state hidden">Keine Lebensmittel gefunden.</p>
     </section>
 
+    <!-- Gerichte -->
+    <section id="view-dishes" class="view">
+      <form id="add-dish-form" class="card add-form">
+        <label for="new-dish-name">Neues Gericht</label>
+        <input type="text" id="new-dish-name" placeholder="z.B. Spaghetti Bolognese" autocomplete="off" required>
+
+        <label for="new-dish-ingredients" style="margin-top: 0.75rem;">Zutaten (eine pro Zeile)</label>
+        <textarea id="new-dish-ingredients" placeholder="Nudeln&#10;Tomaten&#10;Hackfleisch&#10;Zwiebeln" rows="4"></textarea>
+
+        <div class="button-row" style="margin-top: 0.75rem;">
+          <button type="submit" class="btn btn-primary">Gericht speichern</button>
+        </div>
+      </form>
+
+      <div class="search-box">
+        <input type="search" id="dish-search" placeholder="Gerichte suchen…" autocomplete="off">
+      </div>
+
+      <div id="dish-list" class="dish-list"></div>
+      <p id="dishes-empty" class="empty-state hidden">Noch keine Gerichte. Lege oben dein erstes Gericht an.</p>
+    </section>
+
     <!-- Wochenplan -->
     <section id="view-mealplan" class="view">
       <div class="week-nav">
@@ -97,11 +119,38 @@
       <span class="nav-icon" aria-hidden="true">🥬</span>
       <span>Lebensmittel</span>
     </button>
+    <button type="button" class="nav-btn" data-view="dishes">
+      <span class="nav-icon" aria-hidden="true">🍽️</span>
+      <span>Gerichte</span>
+    </button>
     <button type="button" class="nav-btn" data-view="mealplan">
       <span class="nav-icon" aria-hidden="true">📅</span>
       <span>Wochenplan</span>
     </button>
   </nav>
+
+  <div id="dish-detail-overlay" class="modal-overlay hidden">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h2 id="dish-detail-title">Gericht</h2>
+        <button type="button" class="icon-btn modal-close" id="close-dish-detail" aria-label="Schließen">✕</button>
+      </div>
+      <h3 class="section-label">Zutaten</h3>
+      <ul id="dish-detail-ingredients" class="ingredient-list"></ul>
+      <button type="button" class="btn btn-primary btn-full" id="add-dish-to-plan-btn">Gericht zum Wochenplan hinzufügen</button>
+    </div>
+  </div>
+
+  <div id="day-picker-overlay" class="modal-overlay hidden">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h2>Tag wählen</h2>
+        <button type="button" class="icon-btn modal-close" id="close-day-picker" aria-label="Schließen">✕</button>
+      </div>
+      <p class="modal-hint" id="day-picker-hint">An welchem Tag soll das Gericht stehen?</p>
+      <div id="day-picker-list" class="day-picker-list"></div>
+    </div>
+  </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 

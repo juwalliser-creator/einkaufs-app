@@ -21,6 +21,7 @@
     volume: { label: "Flüssigkeit", units: ["ml", "l"], defaultUnit: "ml" },
     piece: { label: "Stück", units: ["stk"], defaultUnit: "stk" },
     package: { label: "Packung", units: ["pack"], defaultUnit: "pack" },
+    bottle: { label: "Flasche", units: ["fl"], defaultUnit: "fl" },
   };
 
   const FOODS_DB_RESET_KEY = "foodsDbUserResetV1";
@@ -136,7 +137,13 @@
 
   function inferUnitKind(category, name) {
     const n = (name || "").toLowerCase();
-    if (category === "Getränke" || category === "Alkohol") return "volume";
+    if (category === "Alkohol") return "bottle";
+    if (
+      n.includes("wein") || n.includes("bier") || n.includes("sekt") ||
+      n.includes("prosecco") || n.includes("whisky") || n.includes("likör") ||
+      n.includes("flasche")
+    ) return "bottle";
+    if (category === "Getränke") return "volume";
     if (n === "milch" || n === "olivenöl" || n === "saft" || n === "wasser" || n === "joghurt") return "volume";
     if (category === "Tiefkühl") return "package";
     if (
@@ -153,6 +160,7 @@
 
   function unitDisplayLabel(unit, amount) {
     if (unit === "pack") return amount === 1 ? "Packung" : "Packungen";
+    if (unit === "fl") return amount === 1 ? "Flasche" : "Flaschen";
     return unit;
   }
 
@@ -169,6 +177,7 @@
     if (unit === "ml" || unit === "l") return "volume";
     if (unit === "stk") return "piece";
     if (unit === "pack") return "package";
+    if (unit === "fl") return "bottle";
     return null;
   }
 
@@ -180,7 +189,7 @@
     if (unit === "g") return value;
     if (unit === "l") return value * 1000;
     if (unit === "ml") return value;
-    if (unit === "stk" || unit === "pack") return value;
+    if (unit === "stk" || unit === "pack" || unit === "fl") return value;
     return null;
   }
 
@@ -202,6 +211,9 @@
     }
     if (unitKind === "package") {
       return { amount: Math.round(base * 100) / 100, unit: "pack" };
+    }
+    if (unitKind === "bottle") {
+      return { amount: Math.round(base * 100) / 100, unit: "fl" };
     }
     return { amount: Math.round(base * 100) / 100, unit: "stk" };
   }
@@ -331,7 +343,7 @@
     kind.units.forEach(function (unit) {
       const option = document.createElement("option");
       option.value = unit;
-      option.textContent = unit === "pack" ? "Pack." : unit;
+      option.textContent = unit === "pack" ? "Pack." : unit === "fl" ? "Flasche" : unit;
       selectEl.appendChild(option);
     });
     selectEl.value = selectedUnit && kind.units.indexOf(selectedUnit) !== -1
@@ -849,7 +861,9 @@
   function openAddToListModal(food) {
     pendingAddToListFoodId = food.id;
     els.addToListFoodLabel.textContent = food.name;
-    els.addToListAmount.value = (food.unitKind === "piece" || food.unitKind === "package") ? "1" : "";
+    els.addToListAmount.value = (
+      food.unitKind === "piece" || food.unitKind === "package" || food.unitKind === "bottle"
+    ) ? "1" : "";
     populateUnitSelect(els.addToListUnit, food.unitKind, getDefaultUnit(food.unitKind));
     els.addToListOverlay.classList.remove("hidden");
     els.addToListAmount.focus();
@@ -1088,7 +1102,9 @@
         const kind = UNIT_KINDS[food.unitKind] || UNIT_KINDS.weight;
         const unitHint = food.unitKind === "package"
           ? "Packung"
-          : kind.units.join(" / ");
+          : food.unitKind === "bottle"
+            ? "Flasche"
+            : kind.units.join(" / ");
         meta.textContent = kind.label + " (" + unitHint + ")";
         info.appendChild(name);
         info.appendChild(meta);

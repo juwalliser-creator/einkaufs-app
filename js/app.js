@@ -713,6 +713,31 @@
     return food;
   }
 
+  function deleteFood(id) {
+    const food = foods.find(function (f) {
+      return f.id === id;
+    });
+    if (!food) return;
+    foods = foods.filter(function (f) {
+      return f.id !== id;
+    });
+    dishes.forEach(function (dish) {
+      dish.ingredients.forEach(function (ing) {
+        if (ing.foodId === id) ing.foodId = null;
+      });
+    });
+    Object.keys(weeklyShopping).forEach(function (weekKey) {
+      weeklyShopping[weekKey] = getWeeklyList(weekKey).filter(function (item) {
+        return item.foodId !== id;
+      });
+    });
+    updateFoodNameSuggestions();
+    persistAll();
+    renderFoods();
+    if (activeView === "shopping") renderShoppingList();
+    showToast('"' + food.name + '" aus Datenbank entfernt');
+  }
+
   function addDish(name, ingredients, diet, temp) {
     const cleanName = normalizeName(name);
     if (!cleanName || !diet || !temp) return null;
@@ -1071,12 +1096,25 @@
         addBtn.type = "button";
         addBtn.className = "btn btn-add";
         addBtn.textContent = "+";
+        addBtn.setAttribute("aria-label", food.name + " auf Einkaufsliste");
         addBtn.addEventListener("click", function (e) {
           e.stopPropagation();
           openAddToListModal(food);
         });
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "icon-btn";
+        deleteBtn.textContent = "✕";
+        deleteBtn.setAttribute("aria-label", food.name + " löschen");
+        deleteBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (confirm('Lebensmittel "' + food.name + '" wirklich löschen?')) deleteFood(food.id);
+        });
+
         row.appendChild(info);
         row.appendChild(addBtn);
+        row.appendChild(deleteBtn);
         list.appendChild(row);
       });
       section.appendChild(list);

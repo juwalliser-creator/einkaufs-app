@@ -20,41 +20,12 @@
     weight: { label: "Gewicht", units: ["g", "kg"], defaultUnit: "g" },
     volume: { label: "Flüssigkeit", units: ["ml", "l"], defaultUnit: "ml" },
     piece: { label: "Stück", units: ["stk"], defaultUnit: "stk" },
+    package: { label: "Packung", units: ["pack"], defaultUnit: "pack" },
   };
 
-  let pendingAddToListFoodId = null;
+  const FOODS_DB_RESET_KEY = "foodsDbUserResetV1";
 
-  const DEFAULT_FOODS = [
-    { name: "Milch", category: "Milchprodukte" },
-    { name: "Butter", category: "Milchprodukte" },
-    { name: "Joghurt", category: "Milchprodukte" },
-    { name: "Käse", category: "Milchprodukte" },
-    { name: "Eier", category: "Milchprodukte" },
-    { name: "Brot", category: "Backwaren" },
-    { name: "Brötchen", category: "Backwaren" },
-    { name: "Nudeln", category: "Teigwaren" },
-    { name: "Reis", category: "Teigwaren" },
-    { name: "Mehl", category: "Vorrat" },
-    { name: "Zucker", category: "Vorrat" },
-    { name: "Salz", category: "Gewürze & Kräuter" },
-    { name: "Pfeffer", category: "Gewürze & Kräuter" },
-    { name: "Olivenöl", category: "Vorrat" },
-    { name: "Tomaten", category: "Obst & Gemüse" },
-    { name: "Gurke", category: "Obst & Gemüse" },
-    { name: "Paprika", category: "Obst & Gemüse" },
-    { name: "Zwiebeln", category: "Obst & Gemüse" },
-    { name: "Knoblauch", category: "Obst & Gemüse" },
-    { name: "Kartoffeln", category: "Obst & Gemüse" },
-    { name: "Salat", category: "Obst & Gemüse" },
-    { name: "Äpfel", category: "Obst & Gemüse" },
-    { name: "Bananen", category: "Obst & Gemüse" },
-    { name: "Hähnchenbrust", category: "Fleisch & Fisch" },
-    { name: "Rinderhack", category: "Fleisch & Fisch" },
-    { name: "Lachs", category: "Fleisch & Fisch" },
-    { name: "Wasser", category: "Getränke" },
-    { name: "Saft", category: "Getränke" },
-    { name: "Kaffee", category: "Getränke" },
-  ];
+  let pendingAddToListFoodId = null;
 
   const VIEW_META = {
     shopping: { title: "Einkaufsliste" },
@@ -167,12 +138,22 @@
     const n = (name || "").toLowerCase();
     if (category === "Getränke" || category === "Alkohol") return "volume";
     if (n === "milch" || n === "olivenöl" || n === "saft" || n === "wasser" || n === "joghurt") return "volume";
+    if (category === "Tiefkühl") return "package";
+    if (
+      n.includes("patty") || n.includes("patties") || n.includes("burger") ||
+      n === "salat" || n.includes("salat")
+    ) return "package";
     if (
       n === "eier" || n === "brot" || n === "brötchen" || n === "gurke" ||
-      n === "avocado" || n === "zitrone" || n === "salat"
+      n === "avocado" || n === "zitrone"
     ) return "piece";
     if (category === "Backwaren") return "piece";
     return "weight";
+  }
+
+  function unitDisplayLabel(unit, amount) {
+    if (unit === "pack") return amount === 1 ? "Packung" : "Packungen";
+    return unit;
   }
 
   function isValidUnitForKind(unitKind, unit) {
@@ -187,6 +168,7 @@
     if (unit === "g" || unit === "kg") return "weight";
     if (unit === "ml" || unit === "l") return "volume";
     if (unit === "stk") return "piece";
+    if (unit === "pack") return "package";
     return null;
   }
 
@@ -198,7 +180,7 @@
     if (unit === "g") return value;
     if (unit === "l") return value * 1000;
     if (unit === "ml") return value;
-    if (unit === "stk") return value;
+    if (unit === "stk" || unit === "pack") return value;
     return null;
   }
 
@@ -218,13 +200,16 @@
       }
       return { amount: Math.round(base), unit: "ml" };
     }
+    if (unitKind === "package") {
+      return { amount: Math.round(base * 100) / 100, unit: "pack" };
+    }
     return { amount: Math.round(base * 100) / 100, unit: "stk" };
   }
 
   function formatQuantity(amount, unit) {
     if (amount == null || !unit) return "";
     const display = amount % 1 === 0 ? String(amount) : String(Math.round(amount * 100) / 100);
-    return display + " " + unit;
+    return display + " " + unitDisplayLabel(unit, amount);
   }
 
   function migrateFood(food) {
@@ -328,14 +313,7 @@
   }
 
   function createDefaultFoods() {
-    return DEFAULT_FOODS.map(function (item) {
-      return {
-        id: uid(),
-        name: item.name,
-        category: item.category,
-        unitKind: inferUnitKind(item.category, item.name),
-      };
-    });
+    return [];
   }
 
   function updateFoodNameSuggestions() {
@@ -353,7 +331,7 @@
     kind.units.forEach(function (unit) {
       const option = document.createElement("option");
       option.value = unit;
-      option.textContent = unit;
+      option.textContent = unit === "pack" ? "Pack." : unit;
       selectEl.appendChild(option);
     });
     selectEl.value = selectedUnit && kind.units.indexOf(selectedUnit) !== -1
@@ -535,7 +513,6 @@
 
   function applyRemoteData(data) {
     isRemoteUpdate = true;
-    if (Array.isArray(data.foods)) foods = data.foods.map(migrateFood).filter(Boolean);
     if (Array.isArray(data.dishes)) {
       dishes = data.dishes.map(migrateDish).filter(Boolean);
     }
@@ -549,10 +526,42 @@
     }
     if (data.mealPlan && typeof data.mealPlan === "object") mealPlan = data.mealPlan;
     if (typeof data.weekOffset === "number") weekOffset = data.weekOffset;
+
+    const foodsResetDone = !!data[FOODS_DB_RESET_KEY];
+    if (foodsResetDone && Array.isArray(data.foods)) {
+      foods = data.foods.map(migrateFood).filter(Boolean);
+    } else {
+      foods = [];
+    }
+
     isRemoteUpdate = false;
     isInitialized = true;
     updateFoodNameSuggestions();
     renderActiveView();
+
+    if (!foodsResetDone) {
+      persistFoodsReset();
+      showToast("Lebensmittel-Datenbank geleert – du kannst neu anlegen");
+    }
+  }
+
+  function persistFoodsReset() {
+    if (!roomRef) return;
+    pendingWrites += 1;
+    roomRef.set(
+      {
+        foods: [],
+        [FOODS_DB_RESET_KEY]: true,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    ).catch(function () {
+      showToast("Konnte Lebensmittel-Datenbank nicht leeren");
+    }).finally(function () {
+      setTimeout(function () {
+        pendingWrites -= 1;
+      }, 400);
+    });
   }
 
   function connectToRoom(code) {
@@ -585,7 +594,22 @@
             weekOffset = 0;
             isInitialized = true;
             updateFoodNameSuggestions();
-            persistAll();
+            pendingWrites += 1;
+            roomRef.set({
+              foods: [],
+              dishes: [],
+              weeklyShopping: {},
+              mealPlan: {},
+              weekOffset: 0,
+              [FOODS_DB_RESET_KEY]: true,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            }).catch(function () {
+              showToast("Konnte Gruppe nicht anlegen");
+            }).finally(function () {
+              setTimeout(function () {
+                pendingWrites -= 1;
+              }, 400);
+            });
             renderActiveView();
           }
           return;
@@ -800,7 +824,7 @@
   function openAddToListModal(food) {
     pendingAddToListFoodId = food.id;
     els.addToListFoodLabel.textContent = food.name;
-    els.addToListAmount.value = food.unitKind === "piece" ? "1" : "";
+    els.addToListAmount.value = (food.unitKind === "piece" || food.unitKind === "package") ? "1" : "";
     populateUnitSelect(els.addToListUnit, food.unitKind, getDefaultUnit(food.unitKind));
     els.addToListOverlay.classList.remove("hidden");
     els.addToListAmount.focus();
@@ -1037,7 +1061,10 @@
         const meta = document.createElement("div");
         meta.className = "item-meta";
         const kind = UNIT_KINDS[food.unitKind] || UNIT_KINDS.weight;
-        meta.textContent = kind.label + " (" + kind.units.join(" / ") + ")";
+        const unitHint = food.unitKind === "package"
+          ? "Packung"
+          : kind.units.join(" / ");
+        meta.textContent = kind.label + " (" + unitHint + ")";
         info.appendChild(name);
         info.appendChild(meta);
         const addBtn = document.createElement("button");

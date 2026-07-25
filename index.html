@@ -92,6 +92,12 @@
             <option value="Sonstiges">Sonstiges</option>
           </select>
         </div>
+        <label for="new-food-unit-kind" class="field-label" style="margin-top: 0.75rem;">Mengeneinheit</label>
+        <select id="new-food-unit-kind" aria-label="Mengeneinheit">
+          <option value="weight">Gewicht (g / kg)</option>
+          <option value="volume">Flüssigkeit (ml / l)</option>
+          <option value="piece">Stück</option>
+        </select>
         <div class="button-row">
           <button type="submit" class="btn btn-primary">Speichern</button>
         </div>
@@ -160,8 +166,9 @@
           <label class="toggle-option"><input type="radio" name="new-dish-temp" value="cold"> Kalt</label>
         </div>
 
-        <label for="new-dish-ingredients" style="margin-top: 0.75rem;">Zutaten (eine pro Zeile)</label>
-        <textarea id="new-dish-ingredients" placeholder="Nudeln&#10;Tomaten&#10;Hackfleisch" rows="4"></textarea>
+        <p class="field-label" style="margin-top: 0.75rem;">Zutaten</p>
+        <div id="add-dish-ingredients-list" class="ingredients-editor" aria-label="Zutatenliste"></div>
+        <button type="button" class="btn btn-secondary btn-small ingredient-add-btn" id="add-dish-ingredient-row">+ Zutat hinzufügen</button>
 
         <div class="button-row" style="margin-top: 0.75rem;">
           <button type="submit" class="btn btn-primary">Gericht speichern</button>
@@ -208,8 +215,9 @@
           <label class="toggle-option"><input type="radio" name="edit-dish-temp" value="cold"> Kalt</label>
         </div>
 
-        <label for="edit-dish-ingredients" style="margin-top: 0.75rem;">Zutaten (eine pro Zeile)</label>
-        <textarea id="edit-dish-ingredients" rows="5"></textarea>
+        <p class="field-label" style="margin-top: 0.75rem;">Zutaten</p>
+        <div id="edit-dish-ingredients-list" class="ingredients-editor" aria-label="Zutatenliste"></div>
+        <button type="button" class="btn btn-secondary btn-small ingredient-add-btn" id="edit-dish-ingredient-row">+ Zutat hinzufügen</button>
 
         <div class="button-row" style="margin-top: 0.75rem;">
           <button type="submit" class="btn btn-primary">Änderungen speichern</button>
@@ -229,6 +237,26 @@
       <div id="day-picker-list" class="day-picker-list"></div>
     </div>
   </div>
+
+  <div id="add-to-list-overlay" class="modal-overlay hidden">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h2>Auf Einkaufsliste</h2>
+        <button type="button" class="icon-btn modal-close" id="close-add-to-list" aria-label="Schließen">✕</button>
+      </div>
+      <p id="add-to-list-food-label" class="modal-hint"></p>
+      <label for="add-to-list-amount">Menge</label>
+      <div class="input-row">
+        <input type="number" id="add-to-list-amount" min="0.01" step="any" inputmode="decimal" required>
+        <select id="add-to-list-unit" aria-label="Einheit"></select>
+      </div>
+      <div class="button-row" style="margin-top: 0.75rem;">
+        <button type="button" class="btn btn-primary" id="confirm-add-to-list">Hinzufügen</button>
+      </div>
+    </div>
+  </div>
+
+  <datalist id="food-name-suggestions"></datalist>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 

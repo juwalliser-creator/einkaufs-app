@@ -32,12 +32,12 @@
     { name: "Eier", category: "Milchprodukte" },
     { name: "Brot", category: "Backwaren" },
     { name: "Brötchen", category: "Backwaren" },
-    { name: "Nudeln", category: "Vorrat" },
-    { name: "Reis", category: "Vorrat" },
+    { name: "Nudeln", category: "Teigwaren" },
+    { name: "Reis", category: "Teigwaren" },
     { name: "Mehl", category: "Vorrat" },
     { name: "Zucker", category: "Vorrat" },
-    { name: "Salz", category: "Vorrat" },
-    { name: "Pfeffer", category: "Vorrat" },
+    { name: "Salz", category: "Gewürze & Kräuter" },
+    { name: "Pfeffer", category: "Gewürze & Kräuter" },
     { name: "Olivenöl", category: "Vorrat" },
     { name: "Tomaten", category: "Obst & Gemüse" },
     { name: "Gurke", category: "Obst & Gemüse" },
@@ -165,12 +165,13 @@
 
   function inferUnitKind(category, name) {
     const n = (name || "").toLowerCase();
-    if (category === "Getränke") return "volume";
+    if (category === "Getränke" || category === "Alkohol") return "volume";
     if (n === "milch" || n === "olivenöl" || n === "saft" || n === "wasser" || n === "joghurt") return "volume";
     if (
       n === "eier" || n === "brot" || n === "brötchen" || n === "gurke" ||
       n === "avocado" || n === "zitrone" || n === "salat"
     ) return "piece";
+    if (category === "Backwaren") return "piece";
     return "weight";
   }
 

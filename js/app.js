@@ -26,7 +26,24 @@
 
   const FOODS_DB_RESET_KEY = "foodsDbUserResetV1";
 
+  const FOOD_CATEGORY_ORDER = [
+    "Obst & Gemüse",
+    "Backwaren",
+    "Milchprodukte",
+    "Fleisch & Fisch",
+    "Teigwaren",
+    "Vorrat",
+    "Konserven",
+    "Tiefkühl",
+    "Gewürze & Kräuter",
+    "Getränke",
+    "Alkohol",
+    "Süßigkeiten & Snacks",
+    "Sonstiges",
+  ];
+
   let pendingAddToListFoodId = null;
+  let selectedFoodId = null;
 
   const VIEW_META = {
     shopping: { title: "Einkaufsliste" },
@@ -67,6 +84,8 @@
     shoppingList: document.getElementById("shopping-list"),
     shoppingEmpty: document.getElementById("shopping-empty"),
     shoppingWeekLabel: document.getElementById("shopping-week-label"),
+    quickAddForm: document.getElementById("quick-add-form"),
+    quickAddName: document.getElementById("quick-add-name"),
     foodGroups: document.getElementById("food-groups"),
     foodsEmpty: document.getElementById("foods-empty"),
     foodSearch: document.getElementById("food-search"),
@@ -74,6 +93,13 @@
     newFoodName: document.getElementById("new-food-name"),
     newFoodCategory: document.getElementById("new-food-category"),
     newFoodUnitKind: document.getElementById("new-food-unit-kind"),
+    foodEditOverlay: document.getElementById("food-edit-overlay"),
+    editFoodForm: document.getElementById("edit-food-form"),
+    editFoodName: document.getElementById("edit-food-name"),
+    editFoodCategory: document.getElementById("edit-food-category"),
+    editFoodUnitKind: document.getElementById("edit-food-unit-kind"),
+    closeFoodEdit: document.getElementById("close-food-edit"),
+    cancelFoodEdit: document.getElementById("cancel-food-edit"),
     openAddDishBtn: document.getElementById("open-add-dish-btn"),
     dishAddOverlay: document.getElementById("dish-add-overlay"),
     closeDishAdd: document.getElementById("close-dish-add"),
@@ -750,6 +776,71 @@
     showToast('"' + food.name + '" aus Datenbank entfernt');
   }
 
+  function updateFood(id, name, category, unitKind) {
+    const cleanName = normalizeName(name);
+    if (!cleanName) return null;
+    const food = foods.find(function (f) {
+      return f.id === id;
+    });
+    if (!food) return null;
+    const duplicate = foods.find(function (f) {
+      return f.id !== id && f.name.toLowerCase() === cleanName.toLowerCase();
+    });
+    if (duplicate) {
+      showToast('"' + cleanName + '" existiert bereits');
+      return null;
+    }
+    const oldName = food.name;
+    const kind = UNIT_KINDS[unitKind] ? unitKind : inferUnitKind(category, cleanName);
+    food.name = cleanName;
+    food.category = category || "Sonstiges";
+    food.unitKind = kind;
+    Object.keys(weeklyShopping).forEach(function (weekKey) {
+      getWeeklyList(weekKey).forEach(function (item) {
+        if (item.foodId === id) {
+          item.name = cleanName;
+        } else if (!item.foodId && item.name.toLowerCase() === oldName.toLowerCase()) {
+          item.name = cleanName;
+          item.foodId = id;
+        }
+      });
+    });
+    dishes.forEach(function (dish) {
+      dish.ingredients.forEach(function (ing) {
+        if (ing.foodId === id) return;
+        if (ing.name && ing.name.toLowerCase() === oldName.toLowerCase()) {
+          ing.name = cleanName;
+          ing.foodId = id;
+        }
+      });
+    });
+    foods.sort(function (a, b) {
+      return a.name.localeCompare(b.name, "de");
+    });
+    updateFoodNameSuggestions();
+    persistAll();
+    return food;
+  }
+
+  function openFoodEdit(foodId) {
+    const food = foods.find(function (f) {
+      return f.id === foodId;
+    });
+    if (!food) return;
+    selectedFoodId = foodId;
+    els.editFoodName.value = food.name;
+    els.editFoodCategory.value = food.category;
+    els.editFoodUnitKind.value = food.unitKind || "weight";
+    els.foodEditOverlay.classList.remove("hidden");
+    els.editFoodName.focus();
+  }
+
+  function closeFoodEditModal() {
+    els.foodEditOverlay.classList.add("hidden");
+    els.editFoodForm.reset();
+    selectedFoodId = null;
+  }
+
   function addDish(name, ingredients, diet, temp) {
     const cleanName = normalizeName(name);
     if (!cleanName || !diet || !temp) return null;
@@ -991,63 +1082,110 @@
     });
   }
 
+  function getCategorySortIndex(category) {
+    const idx = FOOD_CATEGORY_ORDER.indexOf(category);
+    return idx === -1 ? FOOD_CATEGORY_ORDER.length : idx;
+  }
+
+  function getItemCategory(item) {
+    if (item.foodId) {
+      const food = foods.find(function (f) {
+        return f.id === item.foodId;
+      });
+      if (food) return food.category;
+    }
+    const byName = findFoodByName(item.name);
+    if (byName) return byName.category;
+    return "Sonstiges";
+  }
+
+  function appendShoppingGroupRow(list, group, weekKey) {
+    const li = document.createElement("li");
+    li.className = "item-row" + (group.checked ? " checked" : "");
+    const checkboxWrap = document.createElement("label");
+    checkboxWrap.className = "checkbox-wrap";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = group.checked;
+    checkbox.addEventListener("change", function () {
+      const items = getWeeklyList(weekKey);
+      items.forEach(function (item) {
+        if (group.itemIds.indexOf(item.id) !== -1) item.checked = !group.checked;
+      });
+      persistAll();
+      renderShoppingList();
+    });
+    checkboxWrap.appendChild(checkbox);
+
+    const textWrap = document.createElement("div");
+    textWrap.className = "item-text";
+    const name = document.createElement("div");
+    name.className = "item-name";
+    name.textContent = shoppingGroupDisplayName(group);
+    textWrap.appendChild(name);
+    if (group.sources.length > 0) {
+      const meta = document.createElement("div");
+      meta.className = "item-meta";
+      meta.textContent = group.sources.join(" · ");
+      textWrap.appendChild(meta);
+    }
+
+    const displayName = shoppingGroupDisplayName(group);
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "icon-btn";
+    removeBtn.setAttribute("aria-label", displayName + " entfernen");
+    removeBtn.textContent = "✕";
+    removeBtn.addEventListener("click", function () {
+      weeklyShopping[weekKey] = getWeeklyList(weekKey).filter(function (item) {
+        return group.itemIds.indexOf(item.id) === -1;
+      });
+      persistAll();
+      renderShoppingList();
+    });
+
+    li.appendChild(checkboxWrap);
+    li.appendChild(textWrap);
+    li.appendChild(removeBtn);
+    list.appendChild(li);
+  }
+
   function renderShoppingItems(container, emptyEl, items, weekKey) {
     container.innerHTML = "";
-    const groups = sortShoppingGroups(aggregateShoppingItems(items));
+    const groups = aggregateShoppingItems(items);
     if (groups.length === 0) {
       emptyEl.classList.remove("hidden");
       return;
     }
     emptyEl.classList.add("hidden");
+
+    const byCategory = {};
     groups.forEach(function (group) {
-      const li = document.createElement("li");
-      li.className = "item-row" + (group.checked ? " checked" : "");
-      const checkboxWrap = document.createElement("label");
-      checkboxWrap.className = "checkbox-wrap";
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.checked = group.checked;
-      checkbox.addEventListener("change", function () {
-        const list = getWeeklyList(weekKey);
-        list.forEach(function (item) {
-          if (group.itemIds.indexOf(item.id) !== -1) item.checked = !group.checked;
-        });
-        persistAll();
-        renderShoppingList();
+      const firstItem = items.find(function (item) {
+        return group.itemIds.indexOf(item.id) !== -1;
       });
-      checkboxWrap.appendChild(checkbox);
+      const category = firstItem ? getItemCategory(firstItem) : "Sonstiges";
+      if (!byCategory[category]) byCategory[category] = [];
+      byCategory[category].push(group);
+    });
 
-      const textWrap = document.createElement("div");
-      textWrap.className = "item-text";
-      const name = document.createElement("div");
-      name.className = "item-name";
-      name.textContent = shoppingGroupDisplayName(group);
-      textWrap.appendChild(name);
-      if (group.sources.length > 0) {
-        const meta = document.createElement("div");
-        meta.className = "item-meta";
-        meta.textContent = group.sources.join(" · ");
-        textWrap.appendChild(meta);
-      }
+    const categories = Object.keys(byCategory).sort(function (a, b) {
+      return getCategorySortIndex(a) - getCategorySortIndex(b);
+    });
 
-      const displayName = shoppingGroupDisplayName(group);
-      const removeBtn = document.createElement("button");
-      removeBtn.type = "button";
-      removeBtn.className = "icon-btn";
-      removeBtn.setAttribute("aria-label", displayName + " entfernen");
-      removeBtn.textContent = "✕";
-      removeBtn.addEventListener("click", function () {
-        weeklyShopping[weekKey] = getWeeklyList(weekKey).filter(function (item) {
-          return group.itemIds.indexOf(item.id) === -1;
-        });
-        persistAll();
-        renderShoppingList();
+    categories.forEach(function (category) {
+      const section = document.createElement("section");
+      section.className = "shopping-category-group";
+      const heading = document.createElement("h3");
+      heading.textContent = category;
+      section.appendChild(heading);
+      const list = document.createElement("ul");
+      list.className = "item-list";
+      sortShoppingGroups(byCategory[category]).forEach(function (group) {
+        appendShoppingGroupRow(list, group, weekKey);
       });
-
-      li.appendChild(checkboxWrap);
-      li.appendChild(textWrap);
-      li.appendChild(removeBtn);
-      container.appendChild(li);
+      section.appendChild(list);
+      container.appendChild(section);
     });
   }
 
@@ -1118,6 +1256,16 @@
           openAddToListModal(food);
         });
 
+        const editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.className = "icon-btn";
+        editBtn.textContent = "✎";
+        editBtn.setAttribute("aria-label", food.name + " bearbeiten");
+        editBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          openFoodEdit(food.id);
+        });
+
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
         deleteBtn.className = "icon-btn";
@@ -1130,6 +1278,7 @@
 
         row.appendChild(info);
         row.appendChild(addBtn);
+        row.appendChild(editBtn);
         row.appendChild(deleteBtn);
         list.appendChild(row);
       });
@@ -1464,6 +1613,46 @@
     showToast(food.name + " in Datenbank gespeichert");
   }
 
+  function handleEditFood(event) {
+    event.preventDefault();
+    if (!selectedFoodId) return;
+    const name = els.editFoodName.value;
+    const category = els.editFoodCategory.value;
+    const unitKind = els.editFoodUnitKind.value;
+    if (!normalizeName(name)) {
+      showToast("Bitte einen Namen eingeben");
+      return;
+    }
+    const food = updateFood(selectedFoodId, name, category, unitKind);
+    if (!food) return;
+    closeFoodEditModal();
+    renderFoods();
+    if (activeView === "shopping") renderShoppingList();
+    showToast('"' + food.name + '" aktualisiert');
+  }
+
+  function handleQuickAdd(event) {
+    event.preventDefault();
+    const query = normalizeName(els.quickAddName.value);
+    if (!query) {
+      showToast("Bitte ein Lebensmittel eingeben");
+      return;
+    }
+    let food = findFoodByName(query);
+    if (!food) {
+      const lower = query.toLowerCase();
+      food = foods.find(function (f) {
+        return f.name.toLowerCase() === lower;
+      });
+    }
+    if (!food) {
+      showToast('"' + query + '" nicht gefunden – bitte unter Lebensmittel anlegen');
+      return;
+    }
+    els.quickAddName.value = "";
+    openAddToListModal(food);
+  }
+
   function handleAddDish(event) {
     event.preventDefault();
     if (!roomRef) {
@@ -1589,6 +1778,13 @@
     });
 
     els.addFoodForm.addEventListener("submit", handleAddFood);
+    els.editFoodForm.addEventListener("submit", handleEditFood);
+    els.closeFoodEdit.addEventListener("click", closeFoodEditModal);
+    els.cancelFoodEdit.addEventListener("click", closeFoodEditModal);
+    els.foodEditOverlay.addEventListener("click", function (e) {
+      if (e.target === els.foodEditOverlay) closeFoodEditModal();
+    });
+    els.quickAddForm.addEventListener("submit", handleQuickAdd);
     els.foodSearch.addEventListener("input", renderFoods);
     els.dishSearch.addEventListener("input", renderDishes);
 

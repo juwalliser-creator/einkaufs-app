@@ -68,11 +68,18 @@
         <span id="shopping-week-label">Diese Woche</span>
         <button type="button" class="btn btn-icon" id="next-week-shopping" aria-label="Nächste Woche">›</button>
       </div>
+      <form id="quick-add-form" class="card quick-add-form">
+        <label for="quick-add-name">Schnell hinzufügen</label>
+        <div class="input-row">
+          <input type="text" id="quick-add-name" list="food-name-suggestions" placeholder="Lebensmittel suchen…" autocomplete="off">
+          <button type="submit" class="btn btn-primary btn-add" aria-label="Zur Liste hinzufügen">+</button>
+        </div>
+      </form>
       <div class="toolbar">
         <button type="button" class="btn btn-secondary" id="clear-checked">Erledigte entfernen</button>
         <button type="button" class="btn btn-danger-outline" id="clear-all">Liste leeren</button>
       </div>
-      <ul id="shopping-list" class="item-list" aria-label="Einkaufsliste"></ul>
+      <div id="shopping-list" class="shopping-groups" aria-label="Einkaufsliste"></div>
       <p id="shopping-empty" class="empty-state">Noch nichts auf der Liste. Füge Lebensmittel hinzu oder plane Gerichte im Wochenplan.</p>
     </section>
 
@@ -243,6 +250,50 @@
       </div>
       <p class="modal-hint" id="day-picker-hint">An welchem Tag soll das Gericht stehen?</p>
       <div id="day-picker-list" class="day-picker-list"></div>
+    </div>
+  </div>
+
+  <div id="food-edit-overlay" class="modal-overlay hidden">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h2>Lebensmittel bearbeiten</h2>
+        <button type="button" class="icon-btn modal-close" id="close-food-edit" aria-label="Schließen">✕</button>
+      </div>
+      <form id="edit-food-form">
+        <label for="edit-food-name">Name</label>
+        <input type="text" id="edit-food-name" autocomplete="off" required>
+
+        <label for="edit-food-category" class="field-label" style="margin-top: 0.75rem;">Kategorie</label>
+        <select id="edit-food-category" aria-label="Kategorie">
+          <option value="Obst & Gemüse">Obst & Gemüse</option>
+          <option value="Milchprodukte">Milchprodukte</option>
+          <option value="Fleisch & Fisch">Fleisch & Fisch</option>
+          <option value="Backwaren">Backwaren</option>
+          <option value="Teigwaren">Teigwaren</option>
+          <option value="Vorrat">Vorrat</option>
+          <option value="Konserven">Konserven</option>
+          <option value="Tiefkühl">Tiefkühl</option>
+          <option value="Gewürze & Kräuter">Gewürze & Kräuter</option>
+          <option value="Getränke">Getränke</option>
+          <option value="Alkohol">Alkohol</option>
+          <option value="Süßigkeiten & Snacks">Süßigkeiten & Snacks</option>
+          <option value="Sonstiges">Sonstiges</option>
+        </select>
+
+        <label for="edit-food-unit-kind" class="field-label" style="margin-top: 0.75rem;">Mengeneinheit</label>
+        <select id="edit-food-unit-kind" aria-label="Mengeneinheit">
+          <option value="weight">Gewicht (g / kg)</option>
+          <option value="volume">Flüssigkeit (ml / l)</option>
+          <option value="piece">Stück</option>
+          <option value="package">Packung</option>
+          <option value="bottle">Flasche</option>
+        </select>
+
+        <div class="button-row" style="margin-top: 0.75rem;">
+          <button type="submit" class="btn btn-primary">Speichern</button>
+          <button type="button" class="btn btn-secondary" id="cancel-food-edit">Abbrechen</button>
+        </div>
+      </form>
     </div>
   </div>
 

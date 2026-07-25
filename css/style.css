@@ -406,6 +406,40 @@ textarea:focus {
   margin-bottom: 1rem;
 }
 
+.shopping-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.shopping-category-group h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.quick-add-form {
+  margin-bottom: 0.75rem;
+}
+
+.quick-add-form label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.quick-add-form .input-row {
+  gap: 0.5rem;
+}
+
+.quick-add-form .btn-add {
+  min-width: 48px;
+  font-size: 1.25rem;
+}
+
 .food-groups {
   display: flex;
   flex-direction: column;

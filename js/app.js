@@ -1100,6 +1100,10 @@
     dayDetailDateKey = null;
   }
 
+  function hideDayDetailOverlay() {
+    els.dayDetailOverlay.classList.add("hidden");
+  }
+
   function assignDishToDay(dish, weekKey, dayKey, dayLabel, options) {
     const opts = options || {};
     if (!mealPlan[weekKey]) mealPlan[weekKey] = {};
@@ -1146,6 +1150,7 @@
 
   function openDishPickerForDate(date) {
     pendingAssignDateKey = dateKeyFromDate(date);
+    hideDayDetailOverlay();
     els.dishPickerHint.textContent =
       "Gericht für " + formatLongDate(date);
     els.dishPickerSearch.value = "";
@@ -1154,10 +1159,14 @@
     els.dishPickerSearch.focus();
   }
 
-  function closeDishPickerModal() {
+  function closeDishPickerModal(restoreDayDetail) {
+    const savedDayKey = dayDetailDateKey;
     pendingAssignDateKey = null;
     els.dishPickerOverlay.classList.add("hidden");
     els.dishPickerSearch.value = "";
+    if (restoreDayDetail !== false && savedDayKey) {
+      openDayDetailModal(parseDateKey(savedDayKey));
+    }
   }
 
   function renderDishPickerList(query) {
@@ -1197,7 +1206,7 @@
         const date = parseDateKey(pendingAssignDateKey);
         const d = findDishById(dish.id);
         if (!d) return;
-        closeDishPickerModal();
+        closeDishPickerModal(false);
         assignDishToDate(date, d);
       });
       els.dishPickerList.appendChild(btn);

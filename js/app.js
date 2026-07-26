@@ -122,6 +122,7 @@
     dayDetailRemoveDish: document.getElementById("day-detail-remove-dish"),
     dayDetailPlanSport: document.getElementById("day-detail-plan-sport"),
     dayDetailAllDone: document.getElementById("day-detail-all-done"),
+    dayDetailClearAll: document.getElementById("day-detail-clear-all"),
     dishPickerOverlay: document.getElementById("dish-picker-overlay"),
     dishPickerHint: document.getElementById("dish-picker-hint"),
     dishPickerSearch: document.getElementById("dish-picker-search"),
@@ -1249,6 +1250,55 @@
     switchView("sport");
   }
 
+  function dayHasContent(date) {
+    const key = dateKeyFromDate(date);
+    const meal = getMealForDate(date);
+    if (meal && meal.dishName) return true;
+    if (!sportLog[key]) return false;
+    return Object.keys(sportLog[key]).some(function (name) {
+      return sportEntryHasData(sportLog[key][name]);
+    });
+  }
+
+  function clearEntireCalendarDay(date) {
+    const key = dateKeyFromDate(date);
+    const weekStart = getWeekStartForDate(date);
+    const weekKey = weekPlanKey(weekStart);
+    const dayKey = getDayKeyFromDate(date);
+    const entry = getDayEntry(weekKey, dayKey);
+    if (entry.dishId) {
+      removeMealPlanIngredientsFromWeeklyList(weekKey, entry.dishId, dayKey);
+    }
+    if (mealPlan[weekKey]) {
+      mealPlan[weekKey][dayKey] = { dishId: "", dishName: "" };
+    }
+    if (sportLog[key]) {
+      delete sportLog[key];
+    }
+    persistAll();
+    if (activeView === "shopping") renderShoppingList();
+    if (activeView === "home") renderHomeCalendar();
+    if (activeView === "sport") renderSportView();
+    showToast("Tag geleert");
+    closeDayDetailModal();
+  }
+
+  function handleClearEntireCalendarDay(date) {
+    const parts = [];
+    const meal = getMealForDate(date);
+    if (meal && meal.dishName) parts.push("Gericht");
+    const key = dateKeyFromDate(date);
+    if (sportLog[key] && Object.keys(sportLog[key]).length > 0) {
+      parts.push("Sport-Einträge");
+    }
+    if (parts.length === 0) return;
+    const list = parts.join(" und ");
+    const msg =
+      list + " an diesem Tag wirklich löschen?\n\n" +
+      "Sport-Einträge aller Personen an diesem Tag werden entfernt.";
+    if (confirm(msg)) clearEntireCalendarDay(date);
+  }
+
   function openDayDetailModal(date) {
     const key = dateKeyFromDate(date);
     dayDetailDateKey = key;
@@ -1263,6 +1313,7 @@
     const myEntry = mine ? getPersonSportEntry(key, mine) : emptySportEntry();
     const showAllDone = mine && sportPlanHasValues(myEntry.plan);
     els.dayDetailAllDone.classList.toggle("hidden", !showAllDone);
+    els.dayDetailClearAll.classList.toggle("hidden", !dayHasContent(date));
 
     els.dayDetailSport.innerHTML = "";
     const persons = getKnownSportPersons();
@@ -2643,6 +2694,10 @@
     els.dayDetailAllDone.addEventListener("click", function () {
       if (!dayDetailDateKey) return;
       handleSportQuickComplete(parseDateKey(dayDetailDateKey));
+    });
+    els.dayDetailClearAll.addEventListener("click", function () {
+      if (!dayDetailDateKey) return;
+      handleClearEntireCalendarDay(parseDateKey(dayDetailDateKey));
     });
     els.dayDetailPickDish.addEventListener("click", function () {
       if (!dayDetailDateKey) return;

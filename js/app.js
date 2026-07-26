@@ -121,6 +121,7 @@
     dayDetailPickDish: document.getElementById("day-detail-pick-dish"),
     dayDetailRemoveDish: document.getElementById("day-detail-remove-dish"),
     dayDetailPlanSport: document.getElementById("day-detail-plan-sport"),
+    dayDetailAllDone: document.getElementById("day-detail-all-done"),
     dishPickerOverlay: document.getElementById("dish-picker-overlay"),
     dishPickerHint: document.getElementById("dish-picker-hint"),
     dishPickerSearch: document.getElementById("dish-picker-search"),
@@ -753,13 +754,16 @@
   }
 
   function weekPlanKey(weekStart) {
-    return weekStart.toISOString().slice(0, 10);
+    return dateKeyFromDate(weekStart);
   }
 
   function dateKeyFromDate(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
-    return d.toISOString().slice(0, 10);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
   }
 
   function parseDateKey(key) {
@@ -1103,6 +1107,39 @@
     return mine.toLowerCase() === name.toLowerCase();
   }
 
+  function markSportAllDone(date, personName) {
+    const name = normalizeName(personName);
+    const key = dateKeyFromDate(date);
+    const entry = getPersonSportEntry(key, name);
+    const done = emptySportValues();
+    SPORT_EXERCISES.forEach(function (ex) {
+      done[ex.key] = entry.plan[ex.key];
+    });
+    const merged = mergeSportEntry(key, name, null, done);
+    return savePersonSportEntry(key, name, merged);
+  }
+
+  function handleSportQuickComplete(date, personName) {
+    const name = normalizeName(personName || getPersonName());
+    if (!name) {
+      showToast("Bitte zuerst deinen Namen eintragen");
+      return;
+    }
+    const key = dateKeyFromDate(date);
+    const entry = getPersonSportEntry(key, name);
+    if (!sportPlanHasValues(entry.plan)) {
+      showToast("Zuerst Ziele für diesen Tag setzen");
+      return;
+    }
+    if (!confirm("Alles geschafft? Deine Ziele werden als erledigt übernommen.")) return;
+    if (markSportAllDone(date, name)) {
+      showToast("Alles erledigt eingetragen");
+      if (activeView === "home") renderHomeCalendar();
+      if (dayDetailDateKey === key) openDayDetailModal(date);
+      if (activeView === "sport") renderSportView();
+    }
+  }
+
   function savePersonSportEntry(key, personName, entry) {
     const cleanName = normalizeName(personName);
     if (!cleanName) {
@@ -1222,6 +1259,11 @@
     els.dayDetailPickDish.textContent = meal ? "Gericht ändern" : "Gericht wählen";
     els.dayDetailRemoveDish.classList.toggle("hidden", !meal);
 
+    const mine = getPersonName();
+    const myEntry = mine ? getPersonSportEntry(key, mine) : emptySportEntry();
+    const showAllDone = mine && sportPlanHasValues(myEntry.plan);
+    els.dayDetailAllDone.classList.toggle("hidden", !showAllDone);
+
     els.dayDetailSport.innerHTML = "";
     const persons = getKnownSportPersons();
     let hasSport = false;
@@ -1243,7 +1285,7 @@
       if (isCurrentSportPerson(name)) {
         const hint = document.createElement("span");
         hint.className = "day-detail-tap-hint";
-        hint.textContent = "Tippen für Erledigt";
+        hint.textContent = "Tippen für manuell";
         nameEl.appendChild(hint);
       }
       block.appendChild(nameEl);
@@ -1472,6 +1514,23 @@
         const line = document.createElement("span");
         line.className = "calendar-sport-line " + sportStatusClass(entry);
         line.textContent = name + " " + summary;
+        if (isCurrentSportPerson(name) && sportPlanHasValues(entry.plan)) {
+          line.classList.add("calendar-sport-line-clickable");
+          line.setAttribute("role", "button");
+          line.setAttribute("tabindex", "0");
+          line.setAttribute("title", "Alles geschafft markieren");
+          line.addEventListener("click", function (e) {
+            e.stopPropagation();
+            handleSportQuickComplete(cellDate, name);
+          });
+          line.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") {
+              e.stopPropagation();
+              e.preventDefault();
+              handleSportQuickComplete(cellDate, name);
+            }
+          });
+        }
         sportWrap.appendChild(line);
       });
       if (sportWrap.childNodes.length > 0) btn.appendChild(sportWrap);
@@ -2580,6 +2639,10 @@
     els.dayDetailPlanSport.addEventListener("click", function () {
       if (!dayDetailDateKey) return;
       openSportPlanModal(parseDateKey(dayDetailDateKey));
+    });
+    els.dayDetailAllDone.addEventListener("click", function () {
+      if (!dayDetailDateKey) return;
+      handleSportQuickComplete(parseDateKey(dayDetailDateKey));
     });
     els.dayDetailPickDish.addEventListener("click", function () {
       if (!dayDetailDateKey) return;

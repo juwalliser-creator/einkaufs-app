@@ -1157,6 +1157,16 @@ textarea:focus {
   background: var(--primary-light);
 }
 
+.calendar-sport-line.calendar-sport-line-clickable {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.calendar-sport-line.calendar-sport-line-clickable:active {
+  opacity: 0.75;
+}
+
 @media (min-width: 768px) {
   .app-header {
     padding: 1.5rem 2rem;

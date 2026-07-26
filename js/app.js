@@ -58,7 +58,6 @@
     shopping: { title: "Einkaufsliste" },
     foods: { title: "Lebensmittel" },
     dishes: { title: "Gerichte" },
-    mealplan: { title: "Wochenplan" },
   };
 
   let db = null;
@@ -74,6 +73,7 @@
   let calendarMonthOffset = 0;
   let sportViewDate = null;
   let dayDetailDateKey = null;
+  let pendingAssignDateKey = null;
 
   let foods = [];
   let dishes = [];
@@ -106,8 +106,14 @@
     dayDetailMeal: document.getElementById("day-detail-meal"),
     dayDetailSport: document.getElementById("day-detail-sport"),
     closeDayDetail: document.getElementById("close-day-detail"),
+    dayDetailPickDish: document.getElementById("day-detail-pick-dish"),
+    dayDetailRemoveDish: document.getElementById("day-detail-remove-dish"),
     dayDetailGotoSport: document.getElementById("day-detail-goto-sport"),
-    dayDetailGotoMealplan: document.getElementById("day-detail-goto-mealplan"),
+    dishPickerOverlay: document.getElementById("dish-picker-overlay"),
+    dishPickerHint: document.getElementById("dish-picker-hint"),
+    dishPickerSearch: document.getElementById("dish-picker-search"),
+    dishPickerList: document.getElementById("dish-picker-list"),
+    closeDishPicker: document.getElementById("close-dish-picker"),
     shoppingList: document.getElementById("shopping-list"),
     shoppingEmpty: document.getElementById("shopping-empty"),
     shoppingWeekLabel: document.getElementById("shopping-week-label"),
@@ -162,8 +168,6 @@
     dayPickerHint: document.getElementById("day-picker-hint"),
     dayPickerList: document.getElementById("day-picker-list"),
     closeDayPicker: document.getElementById("close-day-picker"),
-    mealPlanEl: document.getElementById("meal-plan"),
-    weekLabel: document.getElementById("week-label"),
     toast: document.getElementById("toast"),
   };
 
@@ -1048,6 +1052,8 @@
 
     const meal = getMealForDate(date);
     els.dayDetailMeal.textContent = meal ? meal.dishName : "Kein Gericht geplant";
+    els.dayDetailPickDish.textContent = meal ? "Gericht ändern" : "Gericht wählen";
+    els.dayDetailRemoveDish.classList.toggle("hidden", !meal);
 
     els.dayDetailSport.innerHTML = "";
     const persons = getKnownSportPersons();
@@ -1092,6 +1098,124 @@
   function closeDayDetailModal() {
     els.dayDetailOverlay.classList.add("hidden");
     dayDetailDateKey = null;
+  }
+
+  function assignDishToDay(dish, weekKey, dayKey, dayLabel, options) {
+    const opts = options || {};
+    if (!mealPlan[weekKey]) mealPlan[weekKey] = {};
+    const previous = getDayEntry(weekKey, dayKey);
+    if (previous.dishId) {
+      removeMealPlanIngredientsFromWeeklyList(weekKey, previous.dishId, dayKey);
+    }
+    mealPlan[weekKey][dayKey] = { dishId: dish.id, dishName: dish.name };
+    const added = syncDishIngredientsToWeeklyList(dish, weekKey, dayKey, dayLabel);
+    persistAll();
+    if (opts.closeDayPicker !== false) closeDayPickerModal();
+    if (opts.closeDishDetail !== false) closeDishDetailModal();
+    let msg = dish.name + " für " + dayLabel + " eingeplant";
+    if (added > 0) msg += " – " + added + " Zutat(en) auf Einkaufsliste";
+    showToast(msg);
+    if (activeView === "shopping") renderShoppingList();
+    if (activeView === "home") renderHomeCalendar();
+    return added;
+  }
+
+  function assignDishToDate(date, dish) {
+    const weekStart = getWeekStartForDate(date);
+    const weekKey = weekPlanKey(weekStart);
+    const dayKey = getDayKeyFromDate(date);
+    const dayLabel = date.toLocaleDateString("de-DE", { weekday: "long" });
+    assignDishToDay(dish, weekKey, dayKey, dayLabel, {
+      closeDayPicker: true,
+      closeDishDetail: !dayDetailDateKey,
+    });
+    if (dayDetailDateKey === dateKeyFromDate(date)) {
+      openDayDetailModal(date);
+    }
+  }
+
+  function clearDayEntryForDate(date) {
+    const weekStart = getWeekStartForDate(date);
+    const weekKey = weekPlanKey(weekStart);
+    const dayKey = getDayKeyFromDate(date);
+    clearDayEntry(weekKey, dayKey);
+    if (dayDetailDateKey === dateKeyFromDate(date)) {
+      openDayDetailModal(date);
+    }
+  }
+
+  function openDishPickerForDate(date) {
+    pendingAssignDateKey = dateKeyFromDate(date);
+    els.dishPickerHint.textContent =
+      "Gericht für " + formatLongDate(date);
+    els.dishPickerSearch.value = "";
+    renderDishPickerList("");
+    els.dishPickerOverlay.classList.remove("hidden");
+    els.dishPickerSearch.focus();
+  }
+
+  function closeDishPickerModal() {
+    pendingAssignDateKey = null;
+    els.dishPickerOverlay.classList.add("hidden");
+    els.dishPickerSearch.value = "";
+  }
+
+  function renderDishPickerList(query) {
+    const q = query.trim().toLowerCase();
+    const filtered = dishes.filter(function (dish) {
+      if (!q) return true;
+      return dish.name.toLowerCase().includes(q);
+    }).sort(function (a, b) {
+      return a.name.localeCompare(b.name, "de");
+    });
+
+    els.dishPickerList.innerHTML = "";
+    if (filtered.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "field-hint";
+      empty.textContent = dishes.length === 0
+        ? "Noch keine Gerichte – lege welche unter Gerichte an"
+        : "Keine Treffer";
+      els.dishPickerList.appendChild(empty);
+      return;
+    }
+
+    filtered.forEach(function (dish) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "dish-picker-btn";
+      const name = document.createElement("span");
+      name.className = "item-name";
+      name.textContent = dish.name;
+      const meta = document.createElement("span");
+      meta.className = "item-meta";
+      meta.textContent = dishCategoryLabel(dish);
+      btn.appendChild(name);
+      btn.appendChild(meta);
+      btn.addEventListener("click", function () {
+        if (!pendingAssignDateKey) return;
+        const date = parseDateKey(pendingAssignDateKey);
+        const d = findDishById(dish.id);
+        if (!d) return;
+        closeDishPickerModal();
+        assignDishToDate(date, d);
+      });
+      els.dishPickerList.appendChild(btn);
+    });
+  }
+
+  function getDaysInCalendarMonth() {
+    const monthStart = getCalendarMonthStart(calendarMonthOffset);
+    const year = monthStart.getFullYear();
+    const month = monthStart.getMonth();
+    const days = [];
+    const last = new Date(year, month + 1, 0).getDate();
+    for (let d = 1; d <= last; d += 1) {
+      const date = new Date(year, month, d);
+      date.setHours(0, 0, 0, 0);
+      days.push(date);
+    }
+    return days;
   }
 
   function renderHomeCalendar() {
@@ -1379,7 +1503,6 @@
     persistAll();
     if (selectedDishId === id) closeDishDetailModal();
     renderDishes();
-    if (activeView === "mealplan") renderMealPlan();
     if (activeView === "shopping") renderShoppingList();
     if (activeView === "home") renderHomeCalendar();
     showToast("Gericht gelöscht");
@@ -1893,20 +2016,19 @@
   function openDayPicker() {
     const dish = findDishById(selectedDishId);
     if (!dish) return;
-    const weekStart = getWeekStart(weekOffset);
-    const weekKey = weekPlanKey(weekStart);
-    els.dayPickerHint.textContent = '"' + dish.name + '" – an welchem Tag?';
+    els.dayPickerHint.textContent = '"' + dish.name + '" – welcher Tag im Kalender?';
     els.dayPickerList.innerHTML = "";
 
-    DAYS.forEach(function (day, index) {
-      const date = new Date(weekStart);
-      date.setDate(date.getDate() + index);
-      const entry = getDayEntry(weekKey, day.key);
+    getDaysInCalendarMonth().forEach(function (date) {
+      const weekStart = getWeekStartForDate(date);
+      const weekKey = weekPlanKey(weekStart);
+      const dayKey = getDayKeyFromDate(date);
+      const entry = getDayEntry(weekKey, dayKey);
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "day-picker-btn";
       const label = document.createElement("span");
-      label.textContent = day.label;
+      label.textContent = date.toLocaleDateString("de-DE", { weekday: "long" });
       const dateLabel = document.createElement("span");
       dateLabel.className = "day-date";
       dateLabel.textContent = formatDate(date);
@@ -1917,7 +2039,7 @@
       btn.appendChild(dateLabel);
       btn.appendChild(current);
       btn.addEventListener("click", function () {
-        assignDishToDay(dish, weekKey, day.key, day.label);
+        assignDishToDate(date, dish);
       });
       els.dayPickerList.appendChild(btn);
     });
@@ -1928,25 +2050,6 @@
     els.dayPickerOverlay.classList.add("hidden");
   }
 
-  function assignDishToDay(dish, weekKey, dayKey, dayLabel) {
-    if (!mealPlan[weekKey]) mealPlan[weekKey] = {};
-    const previous = getDayEntry(weekKey, dayKey);
-    if (previous.dishId) {
-      removeMealPlanIngredientsFromWeeklyList(weekKey, previous.dishId, dayKey);
-    }
-    mealPlan[weekKey][dayKey] = { dishId: dish.id, dishName: dish.name };
-    const added = syncDishIngredientsToWeeklyList(dish, weekKey, dayKey, dayLabel);
-    persistAll();
-    closeDayPickerModal();
-    closeDishDetailModal();
-    let msg = dish.name + " für " + dayLabel + " eingeplant";
-    if (added > 0) msg += " – " + added + " Zutat(en) auf Einkaufsliste";
-    showToast(msg);
-    if (activeView === "mealplan") renderMealPlan();
-    if (activeView === "shopping") renderShoppingList();
-    if (activeView === "home") renderHomeCalendar();
-  }
-
   function clearDayEntry(weekKey, dayKey) {
     if (!mealPlan[weekKey]) return;
     const entry = getDayEntry(weekKey, dayKey);
@@ -1955,10 +2058,9 @@
     }
     mealPlan[weekKey][dayKey] = { dishId: "", dishName: "" };
     persistAll();
-    renderMealPlan();
     if (activeView === "shopping") renderShoppingList();
     if (activeView === "home") renderHomeCalendar();
-    showToast("Tag geleert");
+    showToast("Gericht entfernt");
   }
 
   function getDayEntry(weekKey, dayKey) {
@@ -1967,74 +2069,12 @@
     return mealPlan[weekKey][dayKey];
   }
 
-  function renderMealPlan() {
-    const weekStart = getWeekStart(weekOffset);
-    els.weekLabel.textContent = getWeekLabelText();
-    const weekKey = weekPlanKey(weekStart);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    els.mealPlanEl.innerHTML = "";
-
-    DAYS.forEach(function (day, index) {
-      const date = new Date(weekStart);
-      date.setDate(date.getDate() + index);
-      const card = document.createElement("article");
-      card.className = "day-card";
-      if (date.getTime() === today.getTime()) card.classList.add("is-today");
-
-      const header = document.createElement("div");
-      header.className = "day-header";
-      const title = document.createElement("h3");
-      title.textContent = day.label;
-      const dateLabel = document.createElement("span");
-      dateLabel.className = "day-date";
-      dateLabel.textContent = formatDate(date);
-      header.appendChild(title);
-      header.appendChild(dateLabel);
-      card.appendChild(header);
-
-      const entry = getDayEntry(weekKey, day.key);
-      const dishBox = document.createElement("div");
-      dishBox.className = "day-dish";
-
-      if (entry.dishName) {
-        const dishName = document.createElement("div");
-        dishName.className = "day-dish-name";
-        dishName.textContent = entry.dishName;
-        dishBox.appendChild(dishName);
-        const dish = entry.dishId ? findDishById(entry.dishId) : null;
-        if (dish && dish.ingredients.length > 0) {
-          const ingredients = document.createElement("div");
-          ingredients.className = "day-dish-ingredients";
-          ingredients.textContent = dish.ingredients.map(formatIngredientLabel).join(", ");
-          dishBox.appendChild(ingredients);
-        }
-        const clearBtn = document.createElement("button");
-        clearBtn.type = "button";
-        clearBtn.className = "btn btn-secondary btn-small";
-        clearBtn.textContent = "Entfernen";
-        clearBtn.addEventListener("click", function () {
-          clearDayEntry(weekKey, day.key);
-        });
-        dishBox.appendChild(clearBtn);
-      } else {
-        const empty = document.createElement("div");
-        empty.className = "day-dish-empty";
-        empty.textContent = "Kein Gericht geplant";
-        dishBox.appendChild(empty);
-      }
-      card.appendChild(dishBox);
-      els.mealPlanEl.appendChild(card);
-    });
-  }
-
   function renderActiveView() {
     if (activeView === "home") renderHomeCalendar();
     if (activeView === "sport") renderSportView();
     if (activeView === "shopping") renderShoppingList();
     if (activeView === "foods") renderFoods();
     if (activeView === "dishes") renderDishes();
-    if (activeView === "mealplan") renderMealPlan();
   }
 
   function openMenu() {
@@ -2177,7 +2217,6 @@
     if (!dish) return;
     closeDishEditModal();
     renderDishes();
-    if (activeView === "mealplan") renderMealPlan();
     if (activeView === "shopping") renderShoppingList();
     if (activeView === "home") renderHomeCalendar();
     showToast('Gericht "' + dish.name + '" aktualisiert');
@@ -2283,12 +2322,6 @@
     document.getElementById("next-week-shopping").addEventListener("click", function () {
       changeWeekOffset(1);
     });
-    document.getElementById("prev-week").addEventListener("click", function () {
-      changeWeekOffset(-1);
-    });
-    document.getElementById("next-week").addEventListener("click", function () {
-      changeWeekOffset(1);
-    });
 
     document.getElementById("prev-month").addEventListener("click", function () {
       changeCalendarMonth(-1);
@@ -2322,14 +2355,23 @@
       closeDayDetailModal();
       openSportForDate(parseDateKey(dayDetailDateKey));
     });
-    els.dayDetailGotoMealplan.addEventListener("click", function () {
+    els.dayDetailPickDish.addEventListener("click", function () {
       if (!dayDetailDateKey) return;
-      const date = parseDateKey(dayDetailDateKey);
-      const thisWeekStart = getWeekStart(0);
-      const targetWeekStart = getWeekStartForDate(date);
-      weekOffset = Math.round((targetWeekStart - thisWeekStart) / (7 * 24 * 60 * 60 * 1000));
-      closeDayDetailModal();
-      switchView("mealplan");
+      openDishPickerForDate(parseDateKey(dayDetailDateKey));
+    });
+    els.dayDetailRemoveDish.addEventListener("click", function () {
+      if (!dayDetailDateKey) return;
+      if (confirm("Gericht an diesem Tag entfernen?")) {
+        clearDayEntryForDate(parseDateKey(dayDetailDateKey));
+      }
+    });
+
+    els.closeDishPicker.addEventListener("click", closeDishPickerModal);
+    els.dishPickerOverlay.addEventListener("click", function (e) {
+      if (e.target === els.dishPickerOverlay) closeDishPickerModal();
+    });
+    els.dishPickerSearch.addEventListener("input", function () {
+      renderDishPickerList(els.dishPickerSearch.value);
     });
 
     els.closeDishDetail.addEventListener("click", closeDishDetailModal);

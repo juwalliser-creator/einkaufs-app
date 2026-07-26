@@ -49,10 +49,6 @@
       <span class="menu-icon" aria-hidden="true">🍽️</span>
       <span>Gerichte</span>
     </button>
-    <button type="button" class="menu-btn" data-view="mealplan">
-      <span class="menu-icon" aria-hidden="true">📅</span>
-      <span>Wochenplan</span>
-    </button>
   </nav>
 
   <div id="setup-overlay" class="setup-overlay hidden">
@@ -150,7 +146,7 @@
         <button type="button" class="btn btn-danger-outline" id="clear-all">Liste leeren</button>
       </div>
       <div id="shopping-list" class="shopping-groups" aria-label="Einkaufsliste"></div>
-      <p id="shopping-empty" class="empty-state">Noch nichts auf der Liste. Füge Lebensmittel hinzu oder plane Gerichte im Wochenplan.</p>
+      <p id="shopping-empty" class="empty-state">Noch nichts auf der Liste. Füge Lebensmittel hinzu oder plane Gerichte im Kalender.</p>
     </section>
 
     <!-- Lebensmittel-Datenbank -->
@@ -217,16 +213,6 @@
       <div id="dish-list" class="dish-list"></div>
       <p id="dishes-empty" class="empty-state hidden">Keine Gerichte in dieser Kategorie.</p>
     </section>
-
-    <!-- Wochenplan -->
-    <section id="view-mealplan" class="view">
-      <div class="week-nav">
-        <button type="button" class="btn btn-icon" id="prev-week" aria-label="Vorherige Woche">‹</button>
-        <span id="week-label">Diese Woche</span>
-        <button type="button" class="btn btn-icon" id="next-week" aria-label="Nächste Woche">›</button>
-      </div>
-      <div id="meal-plan" class="meal-plan"></div>
-    </section>
   </main>
 
   <div id="dish-add-overlay" class="modal-overlay hidden">
@@ -273,7 +259,7 @@
       <ul id="dish-detail-ingredients" class="ingredient-list"></ul>
       <div class="button-row modal-actions">
         <button type="button" class="btn btn-secondary btn-full" id="edit-dish-btn">Bearbeiten</button>
-        <button type="button" class="btn btn-primary btn-full" id="add-dish-to-plan-btn">Zum Wochenplan hinzufügen</button>
+        <button type="button" class="btn btn-primary btn-full" id="add-dish-to-plan-btn">Zum Kalender hinzufügen</button>
       </div>
     </div>
   </div>
@@ -320,6 +306,20 @@
       </div>
       <p class="modal-hint" id="day-picker-hint">An welchem Tag soll das Gericht stehen?</p>
       <div id="day-picker-list" class="day-picker-list"></div>
+    </div>
+  </div>
+
+  <div id="dish-picker-overlay" class="modal-overlay hidden">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h2>Gericht wählen</h2>
+        <button type="button" class="icon-btn modal-close" id="close-dish-picker" aria-label="Schließen">✕</button>
+      </div>
+      <p class="modal-hint" id="dish-picker-hint">Welches Gericht soll an diesem Tag stehen?</p>
+      <div class="search-box">
+        <input type="search" id="dish-picker-search" placeholder="Gerichte suchen…" autocomplete="off">
+      </div>
+      <div id="dish-picker-list" class="dish-picker-list"></div>
     </div>
   </div>
 
@@ -400,8 +400,9 @@
         <div id="day-detail-sport" class="day-detail-sport"></div>
       </div>
       <div class="button-row modal-actions">
+        <button type="button" class="btn btn-primary btn-full" id="day-detail-pick-dish">Gericht wählen</button>
+        <button type="button" class="btn btn-danger-outline btn-full hidden" id="day-detail-remove-dish">Gericht entfernen</button>
         <button type="button" class="btn btn-secondary btn-full" id="day-detail-goto-sport">Sport bearbeiten</button>
-        <button type="button" class="btn btn-secondary btn-full" id="day-detail-goto-mealplan">Wochenplan</button>
       </div>
     </div>
   </div>

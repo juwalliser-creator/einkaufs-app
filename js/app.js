@@ -99,6 +99,7 @@
     sideMenuOverlay: document.getElementById("side-menu-overlay"),
     calendarMonthLabel: document.getElementById("calendar-month-label"),
     calendarGrid: document.getElementById("calendar-grid"),
+    todayOverview: document.getElementById("today-overview"),
     sportPersonName: document.getElementById("sport-person-name"),
     sportDayLabel: document.getElementById("sport-day-label"),
     sportOpenPlan: document.getElementById("sport-open-plan"),
@@ -1511,7 +1512,185 @@
     return days;
   }
 
+  function getTodayDate() {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function appendTodayButtonRow(parent, buttons) {
+    if (!buttons.length) return;
+    const row = document.createElement("div");
+    row.className = "button-row today-action-row";
+    buttons.forEach(function (btn) {
+      row.appendChild(btn);
+    });
+    parent.appendChild(row);
+  }
+
+  function createTodayBtn(label, className, onClick) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = className || "btn btn-secondary btn-small";
+    btn.textContent = label;
+    btn.addEventListener("click", onClick);
+    return btn;
+  }
+
+  function renderTodaySportBlock(container, date, name, entry) {
+    const block = document.createElement("div");
+    block.className = "today-sport-person " + sportStatusClass(entry);
+    const nameEl = document.createElement("div");
+    nameEl.className = "today-sport-name";
+    nameEl.textContent = name;
+    block.appendChild(nameEl);
+
+    const list = document.createElement("ul");
+    list.className = "today-sport-list";
+    let hasLines = false;
+    SPORT_EXERCISES.forEach(function (ex) {
+      const plan = entry.plan[ex.key];
+      const done = entry.done[ex.key];
+      if (plan == null && done == null) return;
+      hasLines = true;
+      const li = document.createElement("li");
+      const label = document.createElement("span");
+      label.className = "today-sport-ex-label";
+      label.textContent = ex.label;
+      const values = document.createElement("span");
+      values.className = "today-sport-ex-values";
+      if (plan != null && done != null) {
+        values.textContent = "Ziel " + plan + " · Erledigt " + done;
+      } else if (plan != null) {
+        values.textContent = "Ziel " + plan;
+      } else {
+        values.textContent = done + " erledigt";
+      }
+      li.appendChild(label);
+      li.appendChild(values);
+      list.appendChild(li);
+    });
+
+    if (!hasLines) {
+      const empty = document.createElement("p");
+      empty.className = "field-hint";
+      empty.textContent = "Noch keine Ziele";
+      block.appendChild(empty);
+    } else {
+      block.appendChild(list);
+    }
+
+    if (isCurrentSportPerson(name)) {
+      const actions = document.createElement("div");
+      actions.className = "today-sport-actions";
+      if (sportPlanHasValues(entry.plan)) {
+        actions.appendChild(createTodayBtn("Alles geschafft", "btn btn-primary btn-small", function () {
+          handleSportQuickComplete(date, name);
+        }));
+      }
+      actions.appendChild(createTodayBtn("Manuell eintragen", "btn btn-secondary btn-small", function () {
+        openSportDoneModal(date, name);
+      }));
+      actions.appendChild(createTodayBtn("Ziele ändern", "btn btn-secondary btn-small", function () {
+        openSportPlanModal(date, name);
+      }));
+      block.appendChild(actions);
+    }
+
+    container.appendChild(block);
+  }
+
+  function renderTodayOverview() {
+    if (!els.todayOverview) return;
+    const today = getTodayDate();
+    const key = dateKeyFromDate(today);
+    els.todayOverview.innerHTML = "";
+
+    const title = document.createElement("h2");
+    title.className = "today-overview-title";
+    title.textContent = "Heute — " + formatLongDate(today);
+    els.todayOverview.appendChild(title);
+
+    const mealSection = document.createElement("section");
+    mealSection.className = "today-section";
+    const mealHeading = document.createElement("h3");
+    mealHeading.className = "section-label";
+    mealHeading.textContent = "🍽 Essen";
+    mealSection.appendChild(mealHeading);
+
+    const meal = getMealForDate(today);
+    const mealText = document.createElement("p");
+    mealText.className = "today-meal-text";
+    mealText.textContent = meal && meal.dishName ? meal.dishName : "Noch kein Gericht geplant";
+    mealSection.appendChild(mealText);
+
+    const mealButtons = [];
+    mealButtons.push(createTodayBtn(
+      meal && meal.dishName ? "Gericht ändern" : "Gericht wählen",
+      "btn btn-secondary btn-small",
+      function () { openDishPickerForDate(today); }
+    ));
+    if (meal && meal.dishName) {
+      mealButtons.push(createTodayBtn("Gericht entfernen", "btn btn-secondary btn-small", function () {
+        if (confirm("Gericht für heute entfernen?")) clearDayEntryForDate(today);
+      }));
+    }
+    appendTodayButtonRow(mealSection, mealButtons);
+    els.todayOverview.appendChild(mealSection);
+
+    const sportSection = document.createElement("section");
+    sportSection.className = "today-section";
+    const sportHeading = document.createElement("h3");
+    sportHeading.className = "section-label";
+    sportHeading.textContent = "🏋 Sport";
+    sportSection.appendChild(sportHeading);
+
+    const sportWrap = document.createElement("div");
+    sportWrap.className = "today-sport-wrap";
+    const persons = getKnownSportPersons();
+    const mine = getPersonName();
+    let hasSportBlock = false;
+
+    persons.forEach(function (name) {
+      const entry = getPersonSportEntry(key, name);
+      if (!sportEntryHasData(entry) && !isCurrentSportPerson(name)) return;
+      if (isCurrentSportPerson(name) || sportEntryHasData(entry)) {
+        renderTodaySportBlock(sportWrap, today, name, entry);
+        hasSportBlock = true;
+      }
+    });
+
+    if (mine && !persons.some(function (n) { return n.toLowerCase() === mine.toLowerCase(); })) {
+      renderTodaySportBlock(sportWrap, today, mine, getPersonSportEntry(key, mine));
+      hasSportBlock = true;
+    }
+
+    if (!hasSportBlock) {
+      const empty = document.createElement("p");
+      empty.className = "field-hint";
+      empty.textContent = "Noch kein Training geplant";
+      sportWrap.appendChild(empty);
+      appendTodayButtonRow(sportWrap, [
+        createTodayBtn("Sport planen", "btn btn-primary btn-small", function () {
+          openSportPlanModal(today);
+        }),
+      ]);
+    }
+
+    sportSection.appendChild(sportWrap);
+    els.todayOverview.appendChild(sportSection);
+
+    if (dayHasContent(today)) {
+      appendTodayButtonRow(els.todayOverview, [
+        createTodayBtn("Heute leeren", "btn btn-danger-outline btn-small", function () {
+          handleClearEntireCalendarDay(today);
+        }),
+      ]);
+    }
+  }
+
   function renderHomeCalendar() {
+    renderTodayOverview();
     const monthStart = getCalendarMonthStart(calendarMonthOffset);
     const year = monthStart.getFullYear();
     const month = monthStart.getMonth();

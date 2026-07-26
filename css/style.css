@@ -860,6 +860,108 @@ textarea:focus {
 }
 
 /* Monatskalender (Startseite) */
+/* Heute-Übersicht (Startseite) */
+.today-overview {
+  margin-bottom: 1.25rem;
+}
+
+.today-overview-title {
+  margin: 0 0 1rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.calendar-section-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.today-section {
+  margin-bottom: 1rem;
+}
+
+.today-section:last-child {
+  margin-bottom: 0;
+}
+
+.today-meal-text {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.today-action-row {
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.today-sport-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.today-sport-person {
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.today-sport-person.sport-ok {
+  background: var(--primary-light);
+}
+
+.today-sport-person.sport-partial {
+  background: #fff8e1;
+}
+
+.today-sport-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 0.35rem;
+}
+
+.today-sport-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.today-sport-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+
+.today-sport-list li:last-child {
+  border-bottom: none;
+}
+
+.today-sport-ex-label {
+  color: var(--text-muted);
+}
+
+.today-sport-ex-values {
+  font-weight: 600;
+  text-align: right;
+}
+
+.today-sport-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+
 .calendar-nav {
   margin-bottom: 0.75rem;
 }

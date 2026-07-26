@@ -743,9 +743,11 @@
     roomRef = null;
     isInitialized = false;
     hideSetupOverlay();
+    activeView = "home";
   }
 
   function enterAppAfterAuth() {
+    switchView("home");
     if (roomRef && isInitialized) return;
     const urlRoom = getRoomFromUrl();
     const storedRoom = getStoredRoom();

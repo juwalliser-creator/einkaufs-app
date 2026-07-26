@@ -120,8 +120,8 @@
   }
 
   function proceedAsVerifiedUser(user) {
-    hideAllAuthOverlays();
     setAppAccess(true);
+    hideAllAuthOverlays();
     const username = pendingUsername || user.displayName || "";
     pendingUsername = "";
     refreshAuthToken(user).then(function () {
@@ -287,6 +287,8 @@
     onSignedOut = callbacks && callbacks.onSignedOut;
     auth = firebase.auth();
     bindEvents();
+    setAppAccess(false);
+    showAuthPanel("login");
     auth.onAuthStateChanged(handleAuthStateChange);
   }
 

@@ -24,6 +24,7 @@
       <h1 id="page-title">Start</h1>
       <button type="button" class="btn btn-header" id="share-link-btn" title="Link teilen">Link teilen</button>
     </div>
+    <p id="sync-status" class="sync-status hidden" aria-live="polite"></p>
   </header>
 
   <div id="side-menu-overlay" class="side-menu-overlay hidden"></div>
@@ -92,6 +93,7 @@
         <span id="sport-day-label">Heute</span>
         <button type="button" class="btn btn-icon" id="next-sport-day" aria-label="Nächster Tag">›</button>
       </div>
+      <div id="sport-week-summary" class="card sport-week-summary" aria-label="Sport-Wochenübersicht"></div>
       <form id="sport-form" class="card sport-actions">
         <h3 class="section-label">Training für diesen Tag</h3>
         <div class="button-row sport-action-buttons">
@@ -108,6 +110,24 @@
         <button type="button" class="btn btn-icon" id="prev-week-shopping" aria-label="Vorherige Woche">‹</button>
         <span id="shopping-week-label">Diese Woche</span>
         <button type="button" class="btn btn-icon" id="next-week-shopping" aria-label="Nächste Woche">›</button>
+        <button type="button" class="btn btn-secondary btn-small" id="shopping-week-today" title="Zur aktuellen Kalenderwoche">Heute</button>
+      </div>
+      <div class="card staples-card">
+        <div class="staples-header">
+          <h3 class="section-label staples-title">Wiederkehrende Basics</h3>
+          <button type="button" class="btn btn-primary btn-small" id="add-all-staples">Alle auf Liste</button>
+        </div>
+        <ul id="staples-list" class="staples-list" aria-label="Basics-Liste"></ul>
+        <p id="staples-empty" class="field-hint staples-empty">Noch keine Basics – unten hinzufügen.</p>
+        <form id="add-staple-form" class="staples-add-form">
+          <label for="staple-food-name">Neues Basic</label>
+          <div class="input-row">
+            <input type="text" id="staple-food-name" list="food-name-suggestions" placeholder="Lebensmittel…" autocomplete="off" required>
+            <input type="number" id="staple-amount" min="0.01" step="any" inputmode="decimal" placeholder="Menge" required>
+            <select id="staple-unit" aria-label="Einheit"></select>
+          </div>
+          <button type="submit" class="btn btn-secondary btn-small">Basic speichern</button>
+        </form>
       </div>
       <form id="quick-add-form" class="card quick-add-form">
         <label for="quick-add-name">Schnell hinzufügen</label>

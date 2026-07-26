@@ -3,6 +3,8 @@
 
   const ROOM_STORAGE_KEY = "einkaufsapp_room";
   const PERSON_STORAGE_KEY = "einkaufsapp_person";
+  const SHOPPING_WEEK_OFFSET_KEY = "einkaufsapp_shopping_week_offset";
+  const OFFLINE_CACHE_KEY = "einkaufsapp_offline_cache";
 
   const SPORT_EXERCISES = [
     { key: "pullups", label: "Klimmzüge", planId: "sport-plan-pullups", doneId: "sport-done-pullups" },
@@ -83,7 +85,9 @@
   let weeklyShopping = {};
   let mealPlan = {};
   let sportLog = {};
-  let weekOffset = 0;
+  let staples = [];
+  let shoppingWeekOffset = 0;
+  let isOfflineMode = false;
 
   let dishFilter = { diet: null, temp: null };
 
@@ -114,6 +118,7 @@
     sportDoneForm: document.getElementById("sport-done-form"),
     closeSportDone: document.getElementById("close-sport-done"),
     sportOthers: document.getElementById("sport-others"),
+    sportWeekSummary: document.getElementById("sport-week-summary"),
     dayDetailOverlay: document.getElementById("day-detail-overlay"),
     dayDetailTitle: document.getElementById("day-detail-title"),
     dayDetailMeal: document.getElementById("day-detail-meal"),
@@ -132,6 +137,14 @@
     shoppingList: document.getElementById("shopping-list"),
     shoppingEmpty: document.getElementById("shopping-empty"),
     shoppingWeekLabel: document.getElementById("shopping-week-label"),
+    staplesList: document.getElementById("staples-list"),
+    staplesEmpty: document.getElementById("staples-empty"),
+    addStapleForm: document.getElementById("add-staple-form"),
+    stapleFoodName: document.getElementById("staple-food-name"),
+    stapleAmount: document.getElementById("staple-amount"),
+    stapleUnit: document.getElementById("staple-unit"),
+    addAllStaplesBtn: document.getElementById("add-all-staples"),
+    syncStatus: document.getElementById("sync-status"),
     quickAddForm: document.getElementById("quick-add-form"),
     quickAddName: document.getElementById("quick-add-name"),
     foodGroups: document.getElementById("food-groups"),
@@ -364,6 +377,134 @@
       dayKey: item.dayKey || null,
       dayLabel: item.dayLabel || null,
     };
+  }
+
+  function migrateStaple(item) {
+    if (!item || typeof item !== "object") return null;
+    const name = normalizeName(item.name || "");
+    if (!name) return null;
+    let amount = item.amount != null ? Number(item.amount) : null;
+    if (amount != null && (!isFinite(amount) || amount <= 0)) amount = null;
+    let unit = item.unit || null;
+    if (unit && !unitKindFromUnit(unit)) unit = null;
+    const unitKind = unitKindFromUnit(unit) || "weight";
+    if (!amount) {
+      amount = unitKind === "piece" || unitKind === "package" || unitKind === "bottle" ? 1 : 1;
+    }
+    if (!unit) unit = getDefaultUnit(unitKind);
+    return {
+      id: item.id || uid(),
+      name: name,
+      foodId: item.foodId || null,
+      amount: amount,
+      unit: unit,
+    };
+  }
+
+  function loadShoppingWeekOffset() {
+    try {
+      const value = localStorage.getItem(SHOPPING_WEEK_OFFSET_KEY);
+      const parsed = parseInt(value, 10);
+      return isFinite(parsed) ? parsed : 0;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  function saveShoppingWeekOffset(offset) {
+    try {
+      localStorage.setItem(SHOPPING_WEEK_OFFSET_KEY, String(offset));
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
+  function getShoppingWeekKey() {
+    return weekPlanKey(getWeekStart(shoppingWeekOffset));
+  }
+
+  function saveOfflineCache(payload) {
+    if (!roomCode) return;
+    try {
+      localStorage.setItem(OFFLINE_CACHE_KEY, JSON.stringify({
+        roomCode: roomCode,
+        savedAt: Date.now(),
+        data: payload,
+      }));
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
+  function loadOfflineCache(expectedRoom) {
+    try {
+      const raw = localStorage.getItem(OFFLINE_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || parsed.roomCode !== expectedRoom || !parsed.data) return null;
+      return parsed;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function updateSyncStatus() {
+    if (!els.syncStatus) return;
+    if (isOfflineMode || !navigator.onLine) {
+      els.syncStatus.textContent = "Offline – zuletzt gespeicherte Daten";
+      els.syncStatus.className = "sync-status offline";
+      els.syncStatus.classList.remove("hidden");
+      return;
+    }
+    if (!roomRef) {
+      els.syncStatus.classList.add("hidden");
+      return;
+    }
+    els.syncStatus.textContent = "Online · synchronisiert";
+    els.syncStatus.className = "sync-status online";
+    els.syncStatus.classList.remove("hidden");
+  }
+
+  function getOfflinePayload() {
+    return {
+      foods: foods,
+      dishes: dishes,
+      weeklyShopping: weeklyShopping,
+      mealPlan: mealPlan,
+      sportLog: sportLog,
+      staples: staples,
+    };
+  }
+
+  function applyOfflineSnapshot(data) {
+    isRemoteUpdate = true;
+    if (Array.isArray(data.dishes)) {
+      dishes = data.dishes.map(migrateDish).filter(Boolean);
+    }
+    if (data.weeklyShopping && typeof data.weeklyShopping === "object") {
+      weeklyShopping = {};
+      Object.keys(data.weeklyShopping).forEach(function (weekKey) {
+        weeklyShopping[weekKey] = (data.weeklyShopping[weekKey] || [])
+          .map(migrateShoppingItem)
+          .filter(Boolean);
+      });
+    }
+    if (data.mealPlan && typeof data.mealPlan === "object") mealPlan = data.mealPlan;
+    if (data.sportLog && typeof data.sportLog === "object") sportLog = data.sportLog;
+    if (Array.isArray(data.staples)) {
+      staples = data.staples.map(migrateStaple).filter(Boolean);
+    } else {
+      staples = [];
+    }
+    if (Array.isArray(data.foods)) {
+      foods = data.foods.map(migrateFood).filter(Boolean);
+    }
+    isRemoteUpdate = false;
+    isInitialized = true;
+    isOfflineMode = true;
+    updateSyncStatus();
+    updateFoodNameSuggestions();
+    renderActiveView();
   }
 
   function formatIngredientLabel(ingredient) {
@@ -617,8 +758,12 @@
       });
     }
     if (data.mealPlan && typeof data.mealPlan === "object") mealPlan = data.mealPlan;
-    if (typeof data.weekOffset === "number") weekOffset = data.weekOffset;
     if (data.sportLog && typeof data.sportLog === "object") sportLog = data.sportLog;
+    if (Array.isArray(data.staples)) {
+      staples = data.staples.map(migrateStaple).filter(Boolean);
+    } else {
+      staples = [];
+    }
 
     const foodsResetDone = !!data[FOODS_DB_RESET_KEY];
     if (foodsResetDone && Array.isArray(data.foods)) {
@@ -629,6 +774,9 @@
 
     isRemoteUpdate = false;
     isInitialized = true;
+    isOfflineMode = false;
+    saveOfflineCache(getOfflinePayload());
+    updateSyncStatus();
     updateFoodNameSuggestions();
     renderActiveView();
 
@@ -673,7 +821,16 @@
     }
     saveRoom(normalized);
     hideSetupOverlay();
+    roomCode = normalized;
     roomRef = db.collection("rooms").doc(roomCode);
+
+    if (!navigator.onLine) {
+      const cached = loadOfflineCache(normalized);
+      if (cached) {
+        applyOfflineSnapshot(cached.data);
+        showToast("Offline – zuletzt gespeicherte Daten geladen");
+      }
+    }
 
     unsubscribeRoom = roomRef.onSnapshot(
       function (snapshot) {
@@ -685,7 +842,7 @@
             weeklyShopping = {};
             mealPlan = {};
             sportLog = {};
-            weekOffset = 0;
+            staples = [];
             isInitialized = true;
             updateFoodNameSuggestions();
             pendingWrites += 1;
@@ -695,7 +852,7 @@
               weeklyShopping: {},
               mealPlan: {},
               sportLog: {},
-              weekOffset: 0,
+              staples: [],
               [FOODS_DB_RESET_KEY]: true,
               updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             }).catch(function () {
@@ -713,13 +870,28 @@
       },
       function (error) {
         console.error(error);
-        showToast("Sync-Fehler: " + error.message);
+        const cached = loadOfflineCache(roomCode);
+        if (cached) {
+          applyOfflineSnapshot(cached.data);
+          showToast("Sync-Fehler – Offline-Daten geladen");
+        } else {
+          showToast("Sync-Fehler: " + error.message);
+        }
       }
     );
   }
 
   function persistAll() {
     if (isRemoteUpdate || !roomRef) return;
+    saveOfflineCache(getOfflinePayload());
+    if (!navigator.onLine) {
+      if (!isOfflineMode) {
+        showToast("Offline – lokal gespeichert, Sync folgt online");
+      }
+      isOfflineMode = true;
+      updateSyncStatus();
+      return;
+    }
     pendingWrites += 1;
     roomRef.set(
       {
@@ -728,13 +900,20 @@
         weeklyShopping: weeklyShopping,
         mealPlan: mealPlan,
         sportLog: sportLog,
-        weekOffset: weekOffset,
+        staples: staples,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
     ).catch(function () {
       showToast("Konnte nicht speichern");
+      isOfflineMode = true;
+      updateSyncStatus();
     }).finally(function () {
+      saveOfflineCache(getOfflinePayload());
+      if (navigator.onLine) {
+        isOfflineMode = false;
+        updateSyncStatus();
+      }
       setTimeout(function () {
         pendingWrites -= 1;
       }, 400);
@@ -1178,6 +1357,101 @@
     renderSportView();
   }
 
+  function sportDayFullyDone(entry) {
+    if (!entry) return false;
+    let hasGoal = false;
+    for (let i = 0; i < SPORT_EXERCISES.length; i += 1) {
+      const ex = SPORT_EXERCISES[i];
+      const plan = entry.plan[ex.key];
+      const done = entry.done[ex.key];
+      if (plan != null && plan > 0) {
+        hasGoal = true;
+        if (done == null || done < plan) return false;
+      }
+    }
+    return hasGoal;
+  }
+
+  function sportDayHasProgress(entry) {
+    if (!entry) return false;
+    return SPORT_EXERCISES.some(function (ex) {
+      const done = entry.done[ex.key];
+      return done != null && done > 0;
+    });
+  }
+
+  function renderSportWeekSummary() {
+    if (!els.sportWeekSummary) return;
+    els.sportWeekSummary.innerHTML = "";
+    const personName = getPersonName();
+    if (!personName) {
+      const hint = document.createElement("p");
+      hint.className = "field-hint";
+      hint.textContent = "Trage deinen Namen ein für die Wochenübersicht.";
+      els.sportWeekSummary.appendChild(hint);
+      return;
+    }
+
+    const date = ensureSportViewDate();
+    const weekStart = getWeekStartForDate(date);
+    let doneCount = 0;
+    let plannedCount = 0;
+
+    const title = document.createElement("h3");
+    title.className = "section-label";
+    title.textContent = "Wochenübersicht";
+
+    const summary = document.createElement("p");
+    summary.className = "sport-week-summary-text";
+
+    const grid = document.createElement("div");
+    grid.className = "sport-week-grid";
+    grid.setAttribute("role", "list");
+
+    for (let i = 0; i < 7; i += 1) {
+      const d = new Date(weekStart);
+      d.setDate(d.getDate() + i);
+      const key = dateKeyFromDate(d);
+      const entry = getPersonSportEntry(key, personName);
+      const hasPlan = sportPlanHasValues(entry.plan);
+      const fullyDone = sportDayFullyDone(entry);
+      const hasProgress = sportDayHasProgress(entry);
+      if (hasPlan) plannedCount += 1;
+      if (fullyDone) doneCount += 1;
+
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "sport-week-day";
+      cell.setAttribute("role", "listitem");
+      if (fullyDone) cell.classList.add("sport-week-day--done");
+      else if (hasProgress || hasPlan) cell.classList.add("sport-week-day--partial");
+
+      const dayLabel = document.createElement("span");
+      dayLabel.className = "sport-week-day-label";
+      dayLabel.textContent = DAYS[i].label.slice(0, 2);
+
+      const dayDate = document.createElement("span");
+      dayDate.className = "sport-week-day-date";
+      dayDate.textContent = String(d.getDate());
+
+      cell.appendChild(dayLabel);
+      cell.appendChild(dayDate);
+      cell.addEventListener("click", function () {
+        setSportViewDate(new Date(d));
+        renderSportView();
+      });
+      grid.appendChild(cell);
+    }
+
+    summary.textContent = plannedCount > 0
+      ? doneCount + " von " + plannedCount + " Tagen mit Zielen geschafft"
+      : "Noch keine Ziele in dieser Woche";
+
+    els.sportWeekSummary.appendChild(title);
+    els.sportWeekSummary.appendChild(summary);
+    els.sportWeekSummary.appendChild(grid);
+  }
+
   function renderSportOthers(key, currentPerson) {
     els.sportOthers.innerHTML = "";
     const persons = getKnownSportPersons().filter(function (name) {
@@ -1241,6 +1515,7 @@
       els.sportOpenDone.title = hasPlan ? "" : "Ziele optional – du kannst auch direkt Erledigt eintragen";
     }
 
+    renderSportWeekSummary();
     renderSportOthers(key, personName);
   }
 
@@ -1775,18 +2050,24 @@
   }
 
   function getWeekLabelText() {
-    const weekStart = getWeekStart(weekOffset);
+    const weekStart = getWeekStart(shoppingWeekOffset);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
-    if (weekOffset === 0) return "Diese Woche";
-    if (weekOffset === 1) return "Nächste Woche";
-    if (weekOffset === -1) return "Letzte Woche";
+    if (shoppingWeekOffset === 0) return "Diese Woche";
+    if (shoppingWeekOffset === 1) return "Nächste Woche";
+    if (shoppingWeekOffset === -1) return "Letzte Woche";
     return formatDate(weekStart) + " – " + formatDate(weekEnd);
   }
 
-  function changeWeekOffset(delta) {
-    weekOffset += delta;
-    persistAll();
+  function changeShoppingWeekOffset(delta) {
+    shoppingWeekOffset += delta;
+    saveShoppingWeekOffset(shoppingWeekOffset);
+    renderActiveView();
+  }
+
+  function resetShoppingWeekOffset() {
+    shoppingWeekOffset = 0;
+    saveShoppingWeekOffset(0);
     renderActiveView();
   }
 
@@ -1994,7 +2275,7 @@
   }
 
   function addFoodToWeeklyList(food, amount, unit) {
-    const weekKey = weekPlanKey(getWeekStart(weekOffset));
+    const weekKey = getShoppingWeekKey();
     const list = getWeeklyList(weekKey);
     const unitKind = food.unitKind || "weight";
     if (!isValidUnitForKind(unitKind, unit)) {
@@ -2170,6 +2451,37 @@
     return "Sonstiges";
   }
 
+  function updateShoppingGroupQuantity(group, weekKey, amount, unit) {
+    const value = Number(amount);
+    if (!isFinite(value) || value <= 0) {
+      showToast("Bitte eine gültige Menge eingeben");
+      return false;
+    }
+    if (!group.unitKind || !isValidUnitForKind(group.unitKind, unit)) {
+      showToast("Ungültige Einheit");
+      return false;
+    }
+    const items = getWeeklyList(weekKey);
+    const firstItem = items.find(function (item) {
+      return group.itemIds.indexOf(item.id) !== -1;
+    });
+    weeklyShopping[weekKey] = items.filter(function (item) {
+      return group.itemIds.indexOf(item.id) === -1;
+    });
+    getWeeklyList(weekKey).push({
+      id: uid(),
+      name: group.name,
+      foodId: firstItem ? firstItem.foodId : null,
+      amount: value,
+      unit: unit,
+      checked: false,
+      addedAt: Date.now(),
+      source: "manual",
+    });
+    persistAll();
+    return true;
+  }
+
   function appendShoppingGroupRow(list, group, weekKey) {
     const li = document.createElement("li");
     li.className = "item-row" + (group.checked ? " checked" : "");
@@ -2190,10 +2502,47 @@
 
     const textWrap = document.createElement("div");
     textWrap.className = "item-text";
-    const name = document.createElement("div");
-    name.className = "item-name";
-    name.textContent = shoppingGroupDisplayName(group);
-    textWrap.appendChild(name);
+
+    if (group.hasAmount && group.unitKind) {
+      const formatted = formatAmountFromBase(group.baseTotal, group.unitKind);
+      const inlineRow = document.createElement("div");
+      inlineRow.className = "shopping-inline-row";
+
+      const amountInput = document.createElement("input");
+      amountInput.type = "number";
+      amountInput.className = "shopping-qty-input";
+      amountInput.min = "0.01";
+      amountInput.step = "any";
+      amountInput.inputMode = "decimal";
+      amountInput.value = formatted ? formatted.amount : "";
+      amountInput.setAttribute("aria-label", "Menge für " + group.name);
+
+      const unitSelect = document.createElement("select");
+      unitSelect.className = "shopping-unit-select";
+      unitSelect.setAttribute("aria-label", "Einheit für " + group.name);
+      populateUnitSelect(unitSelect, group.unitKind, formatted ? formatted.unit : getDefaultUnit(group.unitKind));
+
+      const nameEl = document.createElement("span");
+      nameEl.className = "item-name shopping-inline-name";
+      nameEl.textContent = group.name;
+
+      function commitQtyChange() {
+        updateShoppingGroupQuantity(group, weekKey, amountInput.value, unitSelect.value);
+      }
+      amountInput.addEventListener("change", commitQtyChange);
+      unitSelect.addEventListener("change", commitQtyChange);
+
+      inlineRow.appendChild(amountInput);
+      inlineRow.appendChild(unitSelect);
+      inlineRow.appendChild(nameEl);
+      textWrap.appendChild(inlineRow);
+    } else {
+      const name = document.createElement("div");
+      name.className = "item-name";
+      name.textContent = shoppingGroupDisplayName(group);
+      textWrap.appendChild(name);
+    }
+
     if (group.sources.length > 0) {
       const meta = document.createElement("div");
       meta.className = "item-meta";
@@ -2261,14 +2610,178 @@
   }
 
   function renderShoppingList() {
-    const weekKey = weekPlanKey(getWeekStart(weekOffset));
+    const weekKey = getShoppingWeekKey();
     els.shoppingWeekLabel.textContent = getWeekLabelText();
+    renderStaples();
     renderShoppingItems(
       els.shoppingList,
       els.shoppingEmpty,
       getWeeklyList(weekKey),
       weekKey
     );
+  }
+
+  function syncStapleUnitSelectFromFoodName() {
+    const food = findFoodByName(els.stapleFoodName.value);
+    const unitKind = food ? food.unitKind : inferUnitKind("Sonstiges", els.stapleFoodName.value);
+    populateUnitSelect(els.stapleUnit, unitKind, getDefaultUnit(unitKind));
+    if (
+      food &&
+      (unitKind === "piece" || unitKind === "package" || unitKind === "bottle") &&
+      !els.stapleAmount.value
+    ) {
+      els.stapleAmount.value = "1";
+    }
+  }
+
+  function renderStaples() {
+    if (!els.staplesList) return;
+    els.staplesList.innerHTML = "";
+    if (staples.length === 0) {
+      els.staplesEmpty.classList.remove("hidden");
+      return;
+    }
+    els.staplesEmpty.classList.add("hidden");
+
+    staples.forEach(function (staple) {
+      const li = document.createElement("li");
+      li.className = "staple-row";
+
+      const nameEl = document.createElement("span");
+      nameEl.className = "staple-name";
+      nameEl.textContent = staple.name;
+
+      const amountInput = document.createElement("input");
+      amountInput.type = "number";
+      amountInput.className = "staple-qty-input";
+      amountInput.min = "0.01";
+      amountInput.step = "any";
+      amountInput.inputMode = "decimal";
+      amountInput.value = staple.amount;
+      amountInput.setAttribute("aria-label", "Menge für " + staple.name);
+
+      const unitSelect = document.createElement("select");
+      unitSelect.className = "staple-unit-select";
+      unitSelect.setAttribute("aria-label", "Einheit für " + staple.name);
+      const unitKind = staple.unit ? unitKindFromUnit(staple.unit) : "weight";
+      populateUnitSelect(unitSelect, unitKind, staple.unit || getDefaultUnit(unitKind));
+
+      function saveStapleEdit() {
+        const amount = Number(amountInput.value);
+        if (!isFinite(amount) || amount <= 0) {
+          showToast("Bitte gültige Menge eingeben");
+          amountInput.value = staple.amount;
+          return;
+        }
+        const unit = unitSelect.value;
+        staple.amount = amount;
+        staple.unit = unit;
+        persistAll();
+      }
+      amountInput.addEventListener("change", saveStapleEdit);
+      unitSelect.addEventListener("change", saveStapleEdit);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "icon-btn";
+      removeBtn.textContent = "✕";
+      removeBtn.setAttribute("aria-label", staple.name + " aus Basics entfernen");
+      removeBtn.addEventListener("click", function () {
+        staples = staples.filter(function (s) { return s.id !== staple.id; });
+        persistAll();
+        renderStaples();
+      });
+
+      li.appendChild(nameEl);
+      li.appendChild(amountInput);
+      li.appendChild(unitSelect);
+      li.appendChild(removeBtn);
+      els.staplesList.appendChild(li);
+    });
+  }
+
+  function handleAddStaple(event) {
+    event.preventDefault();
+    const name = normalizeName(els.stapleFoodName.value);
+    const amount = Number(els.stapleAmount.value);
+    const unit = els.stapleUnit.value;
+    if (!name) {
+      showToast("Bitte Lebensmittel wählen");
+      return;
+    }
+    const food = findFoodByName(name);
+    if (!food) {
+      showToast("Lebensmittel zuerst in der Datenbank anlegen");
+      return;
+    }
+    if (!isFinite(amount) || amount <= 0) {
+      showToast("Bitte gültige Menge eingeben");
+      return;
+    }
+    if (!isValidUnitForKind(food.unitKind, unit)) {
+      showToast("Ungültige Einheit");
+      return;
+    }
+    const duplicate = staples.find(function (s) {
+      return s.foodId === food.id || s.name.toLowerCase() === name.toLowerCase();
+    });
+    if (duplicate) {
+      duplicate.amount = amount;
+      duplicate.unit = unit;
+      duplicate.foodId = food.id;
+      duplicate.name = food.name;
+    } else {
+      staples.push({
+        id: uid(),
+        foodId: food.id,
+        name: food.name,
+        amount: amount,
+        unit: unit,
+      });
+    }
+    staples.sort(function (a, b) {
+      return a.name.localeCompare(b.name, "de");
+    });
+    persistAll();
+    els.stapleFoodName.value = "";
+    els.stapleAmount.value = "";
+    syncStapleUnitSelectFromFoodName();
+    renderStaples();
+    showToast('"' + food.name + '" als Basic gespeichert');
+  }
+
+  function addAllStaplesToList() {
+    if (!staples.length) {
+      showToast("Keine Basics gespeichert");
+      return;
+    }
+    const weekKey = getShoppingWeekKey();
+    const list = getWeeklyList(weekKey);
+    let added = 0;
+    staples.forEach(function (staple) {
+      const food = staple.foodId
+        ? foods.find(function (f) { return f.id === staple.foodId; })
+        : findFoodByName(staple.name);
+      if (!food) return;
+      list.push({
+        id: uid(),
+        foodId: food.id,
+        name: food.name,
+        amount: staple.amount,
+        unit: staple.unit,
+        checked: false,
+        addedAt: Date.now(),
+        source: "manual",
+      });
+      added += 1;
+    });
+    if (!added) {
+      showToast("Basics konnten nicht hinzugefügt werden");
+      return;
+    }
+    persistAll();
+    renderShoppingList();
+    showToast(added + " Basics zur Einkaufsliste hinzugefügt");
   }
 
   function renderFoods() {
@@ -2782,7 +3295,7 @@
     els.dishSearch.addEventListener("input", renderDishes);
 
     document.getElementById("clear-checked").addEventListener("click", function () {
-      const weekKey = weekPlanKey(getWeekStart(weekOffset));
+      const weekKey = getShoppingWeekKey();
       weeklyShopping[weekKey] = getWeeklyList(weekKey).filter(function (i) {
         return i.checked;
       });
@@ -2791,7 +3304,7 @@
       showToast("Erledigte entfernt");
     });
     document.getElementById("clear-all").addEventListener("click", function () {
-      const weekKey = weekPlanKey(getWeekStart(weekOffset));
+      const weekKey = getShoppingWeekKey();
       if (!getWeeklyList(weekKey).length) return;
       if (confirm("Einkaufsliste für diese Woche leeren?")) {
         weeklyShopping[weekKey] = [];
@@ -2801,10 +3314,36 @@
     });
 
     document.getElementById("prev-week-shopping").addEventListener("click", function () {
-      changeWeekOffset(-1);
+      changeShoppingWeekOffset(-1);
     });
     document.getElementById("next-week-shopping").addEventListener("click", function () {
-      changeWeekOffset(1);
+      changeShoppingWeekOffset(1);
+    });
+    document.getElementById("shopping-week-today").addEventListener("click", resetShoppingWeekOffset);
+
+    if (els.addStapleForm) {
+      els.addStapleForm.addEventListener("submit", handleAddStaple);
+    }
+    if (els.stapleFoodName) {
+      els.stapleFoodName.addEventListener("input", syncStapleUnitSelectFromFoodName);
+      els.stapleFoodName.addEventListener("change", syncStapleUnitSelectFromFoodName);
+    }
+    if (els.addAllStaplesBtn) {
+      els.addAllStaplesBtn.addEventListener("click", addAllStaplesToList);
+    }
+
+    window.addEventListener("online", function () {
+      isOfflineMode = false;
+      updateSyncStatus();
+      if (roomRef && isInitialized) {
+        persistAll();
+        showToast("Wieder online – synchronisiere…");
+      }
+    });
+    window.addEventListener("offline", function () {
+      isOfflineMode = true;
+      updateSyncStatus();
+      showToast("Offline – zeige gespeicherte Daten");
     });
 
     document.getElementById("prev-month").addEventListener("click", function () {
@@ -2921,9 +3460,14 @@
   }
 
   function startApp() {
+    shoppingWeekOffset = loadShoppingWeekOffset();
     bindEvents();
+    if (els.stapleUnit) {
+      populateUnitSelect(els.stapleUnit, "weight", "g");
+    }
     els.sportPersonName.value = getPersonName();
     setSportViewDate(new Date());
+    updateSyncStatus();
     switchView("home");
     if (!initFirebase()) {
       showSetupOverlay(window.DEFAULT_GROUP_CODE || "FAMILIE");

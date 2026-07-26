@@ -466,6 +466,8 @@ textarea:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.35rem;
   margin-bottom: 1rem;
   background: var(--surface);
   border-radius: var(--radius);
@@ -1291,4 +1293,145 @@ textarea:focus {
   .input-row select {
     flex: 1;
   }
+}
+
+/* Wiederkehrende Basics */
+.staples-card {
+  padding-bottom: 0.85rem;
+}
+
+.staples-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.staples-title {
+  margin: 0;
+}
+
+.staples-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.staple-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px 64px 32px;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.staple-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+  min-width: 0;
+}
+
+.staple-qty-input,
+.staple-unit-select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.5rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.staples-add-form .input-row {
+  margin-bottom: 0.5rem;
+}
+
+.staples-empty {
+  margin: 0 0 0.75rem;
+}
+
+/* Einkaufsliste: Menge direkt bearbeiten */
+.shopping-inline-row {
+  display: grid;
+  grid-template-columns: 72px 64px minmax(0, 1fr);
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.shopping-qty-input,
+.shopping-unit-select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.45rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 16px;
+  font-family: inherit;
+  background: #fff;
+}
+
+.shopping-inline-name {
+  min-width: 0;
+}
+
+/* Sport-Wochenübersicht */
+.sport-week-summary {
+  margin-bottom: 1rem;
+}
+
+.sport-week-summary-text {
+  margin: 0 0 0.75rem;
+  font-size: 0.92rem;
+  color: var(--text-muted);
+}
+
+.sport-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.sport-week-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 0.45rem 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text);
+}
+
+.sport-week-day-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sport-week-day-date {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.sport-week-day--partial {
+  background: #fff8e1;
+  border-color: #f0d78c;
+}
+
+.sport-week-day--done {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
+#shopping-week-today {
+  margin-left: auto;
 }

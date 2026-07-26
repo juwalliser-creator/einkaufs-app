@@ -12,7 +12,7 @@
   function cacheElements() {
     els.authOverlay = document.getElementById("auth-overlay");
     els.verifyOverlay = document.getElementById("verify-overlay");
-    els.authTitle = document.getElementById("auth-title");
+    els.authSubtitle = document.getElementById("auth-subtitle");
     els.authTabLogin = document.getElementById("auth-tab-login");
     els.authTabRegister = document.getElementById("auth-tab-register");
     els.loginForm = document.getElementById("login-form");
@@ -72,7 +72,11 @@
     hideAllAuthOverlays();
     if (els.authOverlay) els.authOverlay.classList.remove("hidden");
     const isRegister = mode === "register";
-    if (els.authTitle) els.authTitle.textContent = isRegister ? "Registrieren" : "Anmelden";
+    if (els.authSubtitle) {
+      els.authSubtitle.textContent = isRegister
+        ? "Erstelle dein Konto für die WG-Planung."
+        : "Melde dich an, um deine Gruppe zu nutzen.";
+    }
     if (els.loginForm) els.loginForm.classList.toggle("hidden", isRegister);
     if (els.registerForm) els.registerForm.classList.toggle("hidden", !isRegister);
     if (els.authTabLogin) {
@@ -98,6 +102,25 @@
     return auth.setPersistence(persistence);
   }
 
+  function refreshAuthToken(user) {
+    if (!user || typeof user.getIdToken !== "function") {
+      return Promise.resolve();
+    }
+    return user.getIdToken(true).catch(function () {
+      return null;
+    });
+  }
+
+  function proceedAsVerifiedUser(user) {
+    hideAllAuthOverlays();
+    const username = pendingUsername || user.displayName || "";
+    pendingUsername = "";
+    refreshAuthToken(user).then(function () {
+      return saveUserProfile(user, username);
+    }).finally(function () {
+      if (typeof onAuthenticated === "function") onAuthenticated(user);
+    });
+  }
   function saveUserProfile(user, username) {
     if (!db || !user) return Promise.resolve();
     const cleanName = normalizeUsername(username || user.displayName || "");
@@ -135,12 +158,7 @@
       if (typeof onSignedOut === "function") onSignedOut();
       return;
     }
-    hideAllAuthOverlays();
-    const username = pendingUsername || user.displayName || "";
-    pendingUsername = "";
-    saveUserProfile(user, username).finally(function () {
-      if (typeof onAuthenticated === "function") onAuthenticated(user);
-    });
+    proceedAsVerifiedUser(user);
   }
 
   function handleLoginSubmit(event) {
@@ -150,6 +168,8 @@
     const staySignedIn = els.loginStaySignedIn.checked;
     applyPersistence(staySignedIn).then(function () {
       return auth.signInWithEmailAndPassword(email, password);
+    }).then(function (credential) {
+      return refreshAuthToken(credential.user);
     }).then(function () {
       showToast("Willkommen zurück!");
     }).catch(function (error) {
@@ -210,12 +230,14 @@
     const user = auth.currentUser;
     if (!user) return;
     user.reload().then(function () {
-      if (auth.currentUser && auth.currentUser.emailVerified) {
-        showToast("E-Mail bestätigt – willkommen!");
-        handleAuthStateChange(auth.currentUser);
-      } else {
-        showToast("Noch nicht bestätigt – bitte Link in der Mail öffnen");
+      const current = auth.currentUser;
+      if (current && current.emailVerified) {
+        return refreshAuthToken(current).then(function () {
+          showToast("E-Mail bestätigt – willkommen!");
+          handleAuthStateChange(current);
+        });
       }
+      showToast("Noch nicht bestätigt – bitte Link in der Mail öffnen");
     }).catch(function (error) {
       showToast(authErrorMessage(error));
     });

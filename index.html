@@ -59,60 +59,66 @@
 
   <div id="auth-overlay" class="setup-overlay hidden">
     <div class="setup-card card auth-card">
-      <h2 id="auth-title">Anmelden</h2>
+      <div class="auth-header">
+        <h2 class="auth-brand">WG Planung</h2>
+        <p class="auth-subtitle" id="auth-subtitle">Melde dich an, um deine Gruppe zu nutzen.</p>
+      </div>
       <div class="auth-tabs" role="tablist" aria-label="Anmeldung">
         <button type="button" class="auth-tab active" id="auth-tab-login" role="tab" aria-selected="true">Anmelden</button>
         <button type="button" class="auth-tab" id="auth-tab-register" role="tab" aria-selected="false">Registrieren</button>
       </div>
 
-      <form id="login-form" class="auth-panel">
-        <label for="login-email">E-Mail</label>
-        <input type="email" id="login-email" autocomplete="email" inputmode="email" required>
-
-        <label for="login-password" class="field-label" style="margin-top: 0.75rem;">Passwort</label>
-        <input type="password" id="login-password" autocomplete="current-password" required>
-
-        <label class="checkbox-line">
-          <input type="checkbox" id="login-stay-signed-in" checked>
-          Angemeldet bleiben
-        </label>
-
-        <div class="button-row" style="margin-top: 0.75rem;">
-          <button type="submit" class="btn btn-primary btn-full">Anmelden</button>
+      <form id="login-form" class="auth-panel auth-form">
+        <div class="auth-field">
+          <label for="login-email" class="auth-label">E-Mail</label>
+          <input type="email" class="auth-input" id="login-email" placeholder="deine@email.de" autocomplete="email" inputmode="email" required>
         </div>
+        <div class="auth-field">
+          <label for="login-password" class="auth-label">Passwort</label>
+          <input type="password" class="auth-input" id="login-password" placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+        <label class="auth-checkbox">
+          <input type="checkbox" id="login-stay-signed-in" checked>
+          <span>Angemeldet bleiben</span>
+        </label>
+        <button type="submit" class="btn btn-primary btn-full auth-submit">Anmelden</button>
       </form>
 
-      <form id="register-form" class="auth-panel hidden">
-        <label for="register-username">Nutzername</label>
-        <input type="text" id="register-username" autocomplete="username" maxlength="32" required>
-
-        <label for="register-email" class="field-label" style="margin-top: 0.75rem;">E-Mail</label>
-        <input type="email" id="register-email" autocomplete="email" inputmode="email" required>
-
-        <label for="register-password" class="field-label" style="margin-top: 0.75rem;">Passwort</label>
-        <input type="password" id="register-password" autocomplete="new-password" minlength="6" required>
-
-        <label for="register-password-confirm" class="field-label" style="margin-top: 0.75rem;">Passwort bestätigen</label>
-        <input type="password" id="register-password-confirm" autocomplete="new-password" minlength="6" required>
-
-        <label class="checkbox-line">
-          <input type="checkbox" id="register-stay-signed-in" checked>
-          Angemeldet bleiben
-        </label>
-
-        <div class="button-row" style="margin-top: 0.75rem;">
-          <button type="submit" class="btn btn-primary btn-full">Konto erstellen</button>
+      <form id="register-form" class="auth-panel auth-form hidden">
+        <div class="auth-field">
+          <label for="register-username" class="auth-label">Nutzername</label>
+          <input type="text" class="auth-input" id="register-username" placeholder="z.B. Max" autocomplete="username" maxlength="32" required>
         </div>
+        <div class="auth-field">
+          <label for="register-email" class="auth-label">E-Mail</label>
+          <input type="email" class="auth-input" id="register-email" placeholder="deine@email.de" autocomplete="email" inputmode="email" required>
+        </div>
+        <div class="auth-field">
+          <label for="register-password" class="auth-label">Passwort</label>
+          <input type="password" class="auth-input" id="register-password" placeholder="Mindestens 6 Zeichen" autocomplete="new-password" minlength="6" required>
+        </div>
+        <div class="auth-field">
+          <label for="register-password-confirm" class="auth-label">Passwort bestätigen</label>
+          <input type="password" class="auth-input" id="register-password-confirm" placeholder="Passwort wiederholen" autocomplete="new-password" minlength="6" required>
+        </div>
+        <label class="auth-checkbox">
+          <input type="checkbox" id="register-stay-signed-in" checked>
+          <span>Angemeldet bleiben</span>
+        </label>
+        <button type="submit" class="btn btn-primary btn-full auth-submit">Konto erstellen</button>
       </form>
     </div>
   </div>
 
   <div id="verify-overlay" class="setup-overlay hidden">
-    <div class="setup-card card">
-      <h2>E-Mail bestätigen</h2>
-      <p>Wir haben eine Bestätigungs-Mail an <strong id="verify-email-display"></strong> gesendet.</p>
-      <p class="field-hint">Bitte klicke den Link in der Mail. Danach hier auf „Bestätigung prüfen“ tippen. Schau auch im Spam-Ordner nach.</p>
-      <div class="button-row auth-verify-actions">
+    <div class="setup-card card auth-card verify-card">
+      <div class="auth-header">
+        <h2 class="auth-brand">E-Mail bestätigen</h2>
+        <p class="auth-subtitle">Fast geschafft – nur noch ein Schritt.</p>
+      </div>
+      <p class="verify-text">Wir haben eine Bestätigungs-Mail an <strong id="verify-email-display"></strong> gesendet.</p>
+      <p class="field-hint verify-hint">Bitte klicke den Link in der Mail. Danach hier auf „Bestätigung prüfen“ tippen. Schau auch im Spam-Ordner nach.</p>
+      <div class="auth-verify-actions">
         <button type="button" class="btn btn-primary btn-full" id="check-verification-btn">Bestätigung prüfen</button>
         <button type="button" class="btn btn-secondary btn-full" id="resend-verification-btn">Mail erneut senden</button>
         <button type="button" class="btn btn-secondary btn-full" id="verify-logout-btn">Abmelden</button>

@@ -1,4 +1,4 @@
-const CACHE_NAME = "einkaufs-app-v36";
+const CACHE_NAME = "einkaufs-app-v37";
 
 const PRECACHE_URLS = [
   "./",

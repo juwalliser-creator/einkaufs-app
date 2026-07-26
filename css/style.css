@@ -192,6 +192,11 @@ body {
   z-index: 100;
 }
 
+#auth-overlay,
+#verify-overlay {
+  z-index: 120;
+}
+
 .setup-card {
   width: 100%;
   max-width: 420px;
@@ -1434,4 +1439,69 @@ textarea:focus {
 
 #shopping-week-today {
   margin-left: auto;
+}
+
+/* Anmeldung */
+.auth-card {
+  max-width: 420px;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.auth-tab {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 999px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-muted);
+}
+
+.auth-tab.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
+.auth-panel.hidden {
+  display: none;
+}
+
+.checkbox-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.checkbox-line input {
+  width: auto;
+  accent-color: var(--primary);
+}
+
+.auth-verify-actions {
+  flex-direction: column;
+  margin-top: 0.75rem;
+}
+
+.side-menu-user {
+  margin: 0.75rem 0 0.25rem;
+  padding: 0 0.25rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+.menu-btn-logout {
+  color: var(--danger);
 }

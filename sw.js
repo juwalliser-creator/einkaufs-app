@@ -1,10 +1,11 @@
-const CACHE_NAME = "einkaufs-app-v35";
+const CACHE_NAME = "einkaufs-app-v36";
 
 const PRECACHE_URLS = [
   "./",
   "./index.html",
   "./css/style.css",
   "./js/app.js",
+  "./js/auth.js",
   "./js/firebase-config.js",
   "./manifest.json",
   "./icons/icon.svg",

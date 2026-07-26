@@ -728,12 +728,31 @@
 
   function initFirebase() {
     if (!firebaseConfigured()) {
-      showSetupOverlay(window.DEFAULT_GROUP_CODE || "FAMILIE");
       return false;
     }
     if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
     db = firebase.firestore();
     return true;
+  }
+
+  function disconnectRoom() {
+    if (unsubscribeRoom) {
+      unsubscribeRoom();
+      unsubscribeRoom = null;
+    }
+    roomRef = null;
+    isInitialized = false;
+    hideSetupOverlay();
+  }
+
+  function enterAppAfterAuth() {
+    if (roomRef && isInitialized) return;
+    const urlRoom = getRoomFromUrl();
+    const storedRoom = getStoredRoom();
+    const defaultRoom = window.DEFAULT_GROUP_CODE || "FAMILIE";
+    if (urlRoom) connectToRoom(urlRoom);
+    else if (storedRoom) connectToRoom(storedRoom);
+    else showSetupOverlay(defaultRoom);
   }
 
   function migrateMealPlanEntry(entry) {
@@ -806,6 +825,11 @@
   }
 
   function connectToRoom(code) {
+    if (!window.WGAuth || !WGAuth.isVerified()) {
+      showToast("Bitte zuerst anmelden und E-Mail bestätigen");
+      if (window.WGAuth) WGAuth.showLogin();
+      return;
+    }
     const normalized = normalizeRoomCode(code);
     if (!normalized) {
       showToast("Bitte einen Gruppencode eingeben");
@@ -3461,6 +3485,7 @@
 
   function startApp() {
     shoppingWeekOffset = loadShoppingWeekOffset();
+    window.showAppToast = showToast;
     bindEvents();
     if (els.stapleUnit) {
       populateUnitSelect(els.stapleUnit, "weight", "g");
@@ -3471,14 +3496,15 @@
     switchView("home");
     if (!initFirebase()) {
       showSetupOverlay(window.DEFAULT_GROUP_CODE || "FAMILIE");
+      showToast("Firebase zuerst einrichten (FIREBASE-SETUP.md)");
       return;
     }
-    const urlRoom = getRoomFromUrl();
-    const storedRoom = getStoredRoom();
-    const defaultRoom = window.DEFAULT_GROUP_CODE || "FAMILIE";
-    if (urlRoom) connectToRoom(urlRoom);
-    else if (storedRoom) connectToRoom(storedRoom);
-    else showSetupOverlay(defaultRoom);
+    if (window.WGAuth) {
+      WGAuth.init(db, {
+        onAuthenticated: enterAppAfterAuth,
+        onSignedOut: disconnectRoom,
+      });
+    }
   }
 
   if ("serviceWorker" in navigator) {

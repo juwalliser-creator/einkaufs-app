@@ -1,88 +1,171 @@
-# Firebase einrichten (einmalig, ca. 10 Minuten)
+# Firebase & Anmeldung einrichten
 
-Damit du und dein Bruder **dieselben Daten** seht, braucht die App einen kostenlosen Cloud-Speicher bei Google (Firebase).
+Damit du und dein Bruder **dieselben Daten** seht und nur **ihr zwei** (mit bestätigter E-Mail) reinkommt.
 
-## Schritt 1: Google-Konto
+Geschätzter Aufwand für dich: **ca. 45–60 Minuten**, einmalig.
 
-Du brauchst ein Google-Konto (Gmail). Falls du eins hast, einfach weiter.
+---
 
-## Schritt 2: Firebase-Projekt anlegen
+## Teil A: Firebase-Projekt (falls noch nicht erledigt)
 
-1. Öffne: https://console.firebase.google.com
-2. Klicke **Projekt hinzufügen** (Add project)
-3. Name z. B.: `einkaufs-app`
-4. Google Analytics kannst du **deaktivieren** (nicht nötig)
-5. Auf **Projekt erstellen** klicken und warten
+### Schritt 1: Google-Konto
 
-## Schritt 3: Firestore aktivieren
+Du brauchst ein Google-Konto (Gmail).
 
-1. Links im Menü: **Build** → **Firestore Database**
-2. **Datenbank erstellen** klicken
-3. Modus: **Im Produktionsmodus starten** → Weiter
-4. Standort: `europe-west3 (Frankfurt)` wählen → **Aktivieren**
+### Schritt 2: Firebase-Projekt anlegen
 
-## Schritt 4: Sicherheitsregeln (wichtig)
+1. Öffne: https://console.firebase.google.com  
+2. **Projekt hinzufügen**  
+3. Name z. B.: `einkaufs-app`  
+4. Google Analytics kann **aus** bleiben  
+5. **Projekt erstellen**
 
-1. Oben im Firestore-Bereich: Tab **Regeln** (Rules)
-2. Alles ersetzen durch:
+### Schritt 3: Firestore aktivieren
+
+1. Links: **Build** → **Firestore Database**  
+2. **Datenbank erstellen**  
+3. Modus: **Im Produktionsmodus starten**  
+4. Standort: `europe-west3 (Frankfurt)` → **Aktivieren**
+
+### Schritt 4: Web-App registrieren
+
+1. Projektübersicht (Zahnrad) → **Projekteinstellungen**  
+2. Nach unten → **App hinzufügen** → **Web** (`</>`)  
+3. Spitzname: `WG Planung` → **App registrieren**  
+4. Werte kopieren (`apiKey`, `projectId`, …)
+
+### Schritt 5: Werte in die App eintragen
+
+1. Datei `js/firebase-config.js` öffnen  
+2. Platzhalter durch deine echten Werte ersetzen  
+3. Speichern (Strg+S)
+
+---
+
+## Teil B: E-Mail-Anmeldung aktivieren (neu, wichtig)
+
+### Schritt 6: Authentication einschalten
+
+1. Firebase Console → **Build** → **Authentication**  
+2. **Los geht's** / **Get started**  
+3. Tab **Sign-in method** / **Anmeldemethoden**  
+4. **E-Mail/Passwort** (Email/Password) anklicken  
+5. **Aktivieren** → **Speichern**
+
+### Schritt 7: Authorized Domains prüfen
+
+1. Authentication → **Settings** / **Einstellungen**  
+2. Unter **Authorized domains** muss stehen:  
+   - `localhost` (zum Testen am PC)  
+   - `juwalliser-creator.github.io` (deine GitHub Pages URL)  
+3. Fehlt die GitHub-Domain → **Add domain** → eintragen → speichern
+
+### Schritt 8: Bestätigungs-Mail anpassen (optional)
+
+1. Authentication → **Templates** / **Vorlagen**  
+2. **Email address verification**  
+3. Absendername z. B. `WG Planung` anpassen  
+4. Speichern  
+
+(Die Mail kommt von `noreply@…firebaseapp.com` – ggf. im **Spam** suchen.)
+
+---
+
+## Teil C: Firestore-Regeln (neu, wichtig)
+
+Ohne diese Regeln funktioniert die Anmeldung **nicht** (Firebase blockiert Zugriff).
+
+### Schritt 9: Regeln veröffentlichen
+
+1. Firestore → Tab **Regeln** / **Rules**  
+2. Alles ersetzen durch den Inhalt aus der Datei `firestore.rules` in diesem Projekt:
 
 ```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    match /users/{userId} {
+      allow read, write: if isVerified() && request.auth.uid == userId;
+    }
+
     match /rooms/{roomId} {
-      allow read, write: if true;
+      allow read, write: if isVerified();
     }
   }
 }
 ```
 
-3. **Veröffentlichen** klicken
+3. **Veröffentlichen** / **Publish**
 
-> Hinweis: Jeder mit dem Gruppencode kann lesen/schreiben. Teile den Code nur mit deinem Bruder.
+> Nur **eingeloggte Nutzer mit bestätigter E-Mail** dürfen lesen/schreiben. Der Gruppencode bleibt zusätzlich in der App.
 
-## Schritt 5: Web-App registrieren
+---
 
-1. Projektübersicht (Zahnrad oben links) → **Projekteinstellungen**
-2. Nach unten scrollen → **App hinzufügen** → Symbol **Web** (`</>`)
-3. App-Spitzname: `Einkaufs App` → **App registrieren**
-4. Es erscheinen Werte wie `apiKey`, `projectId` usw.
+## Teil D: App online stellen & testen
 
-## Schritt 6: Werte in die App eintragen
+### Schritt 10: Code hochladen
 
-1. In VS Code die Datei `js/firebase-config.js` öffnen
-2. Die Platzhalter durch deine echten Werte ersetzen, z. B.:
+1. GitHub Desktop öffnen  
+2. Geänderte Dateien committen, z. B.: `Anmeldung mit E-Mail-Bestätigung`  
+3. **Push origin**  
+4. 2–5 Minuten warten  
 
-```javascript
-window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSy...",
-  authDomain: "einkaufs-app.firebaseapp.com",
-  projectId: "einkaufs-app",
-  storageBucket: "einkaufs-app.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef",
-};
-```
+### Schritt 11: Ersten Account anlegen (du)
 
-3. Datei speichern (Strg+S)
+1. App öffnen: https://juwalliser-creator.github.io/einkaufs-app/  
+2. **Hard-Refresh** (iPhone: Seite neu laden / Cache leeren)  
+3. Tab **Registrieren**  
+4. Nutzername, E-Mail, Passwort, Passwort bestätigen  
+5. **Angemeldet bleiben** aktiviert lassen → **Konto erstellen**  
+6. E-Mail-Postfach öffnen → Link **Bestätigung** klicken  
+7. Zur App → **Bestätigung prüfen**  
+8. Gruppencode eingeben (z. B. `family`) → **Beitreten**
 
-## Schritt 7: App neu hochladen
+### Schritt 12: Zweiten Account (Bruder)
 
-Wenn die App schon auf GitHub liegt:
+1. Link schicken (mit `?gruppe=family` wenn ihr wollt)  
+2. Er registriert sich **mit seiner eigenen E-Mail**  
+3. E-Mail bestätigen  
+4. **Denselben Gruppencode** eingeben  
 
-1. GitHub Desktop öffnen
-2. Du siehst die geänderten Dateien
-3. Unten Summary: `Firebase Sync hinzugefügt`
-4. **Commit to main** → **Push origin**
+---
 
-Nach 1–2 Minuten ist die Online-Version aktualisiert.
+## So funktioniert „Angemeldet bleiben“
 
-## Schritt 8: Link an deinen Bruder schicken
+- Haken **an** (Standard): Du bleibst eingeloggt, auch nach App schließen  
+- Haken **aus**: Login gilt nur für diese Browser-Sitzung  
 
-Schicke den Link **mit Gruppencode**, z. B.:
+---
 
-`https://DEIN-NAME.github.io/einkaufs-app/?gruppe=FAMILIE`
+## Kurz-Checkliste
 
-Beide müssen **denselben Gruppencode** haben (Standard: `FAMILIE`, änderbar in `firebase-config.js`).
+- [ ] Firestore aktiv  
+- [ ] Authentication → E-Mail/Passwort **an**  
+- [ ] Domain `juwalliser-creator.github.io` erlaubt  
+- [ ] Firestore-Regeln **veröffentlicht** (aus `firestore.rules`)  
+- [ ] `firebase-config.js` ausgefüllt  
+- [ ] Code gepusht  
+- [ ] Account 1: registriert + E-Mail bestätigt  
+- [ ] Account 2: registriert + E-Mail bestätigt  
+- [ ] Beide in derselben Gruppe  
 
-In der App kannst du den Link auch über **Link teilen** kopieren.
+---
+
+## Probleme?
+
+| Problem | Lösung |
+|--------|--------|
+| Keine Mail | Spam prüfen, „Mail erneut senden“ |
+| „Permission denied“ | Regeln aus Schritt 9 veröffentlicht? |
+| Login klappt nicht | E-Mail/Passwort-Methode aktiviert? |
+| Domain-Fehler | Authorized domains prüfen (Schritt 7) |
+
+Bei Fragen: Fehlermeldung aus der App oder Browser-Konsole (F12) notieren.

@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#2d6a4f">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Einkauf & Plan">
-  <title>Einkauf & Wochenplan</title>
+  <meta name="apple-mobile-web-app-title" content="WG Planung">
+  <title>WG Planung</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon.svg">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -21,7 +21,7 @@
         <span></span>
         <span></span>
       </button>
-      <h1 id="page-title">Einkaufsliste</h1>
+      <h1 id="page-title">Start</h1>
       <button type="button" class="btn btn-header" id="share-link-btn" title="Link teilen">Link teilen</button>
     </div>
   </header>
@@ -29,7 +29,15 @@
   <div id="side-menu-overlay" class="side-menu-overlay hidden"></div>
   <nav id="side-menu" class="side-menu" aria-label="Hauptnavigation">
     <p class="side-menu-title">Menü</p>
-    <button type="button" class="menu-btn active" data-view="shopping" aria-current="page">
+    <button type="button" class="menu-btn active" data-view="home" aria-current="page">
+      <span class="menu-icon" aria-hidden="true">🏠</span>
+      <span>Start</span>
+    </button>
+    <button type="button" class="menu-btn" data-view="sport">
+      <span class="menu-icon" aria-hidden="true">🏋</span>
+      <span>Sport</span>
+    </button>
+    <button type="button" class="menu-btn" data-view="shopping">
       <span class="menu-icon" aria-hidden="true">🛒</span>
       <span>Liste</span>
     </button>
@@ -61,8 +69,70 @@
   </div>
 
   <main class="app-main">
+    <!-- Start / Monatskalender -->
+    <section id="view-home" class="view active">
+      <div class="calendar-nav week-nav">
+        <button type="button" class="btn btn-icon" id="prev-month" aria-label="Vorheriger Monat">‹</button>
+        <span id="calendar-month-label">Monat</span>
+        <button type="button" class="btn btn-icon" id="next-month" aria-label="Nächster Monat">›</button>
+      </div>
+      <div class="calendar-weekdays" aria-hidden="true">
+        <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+      </div>
+      <div id="calendar-grid" class="calendar-grid" role="grid" aria-label="Monatskalender"></div>
+    </section>
+
+    <!-- Sport -->
+    <section id="view-sport" class="view">
+      <div class="card sport-person-card">
+        <label for="sport-person-name">Dein Name</label>
+        <input type="text" id="sport-person-name" placeholder="z.B. Max" autocomplete="name" maxlength="32">
+        <p class="field-hint">Wird auf diesem Gerät gespeichert. Dein Bruder trägt auf seinem Handy seinen eigenen Namen ein.</p>
+      </div>
+      <div class="week-nav sport-day-nav">
+        <button type="button" class="btn btn-icon" id="prev-sport-day" aria-label="Vorheriger Tag">‹</button>
+        <span id="sport-day-label">Heute</span>
+        <button type="button" class="btn btn-icon" id="next-sport-day" aria-label="Nächster Tag">›</button>
+      </div>
+      <form id="sport-form" class="card sport-form">
+        <h3 class="section-label" id="sport-form-title">Dein Training</h3>
+        <div class="sport-table-wrap">
+          <table class="sport-table" aria-label="Training Plan und Ist">
+            <thead>
+              <tr>
+                <th scope="col">Übung</th>
+                <th scope="col">Ziel</th>
+                <th scope="col">Erledigt</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Klimmzüge</th>
+                <td><input type="number" id="sport-pullups-plan" min="0" step="1" inputmode="numeric" placeholder="–" aria-label="Klimmzüge Ziel"></td>
+                <td><input type="number" id="sport-pullups-done" min="0" step="1" inputmode="numeric" placeholder="–" aria-label="Klimmzüge erledigt"></td>
+              </tr>
+              <tr>
+                <th scope="row">Liegestütze</th>
+                <td><input type="number" id="sport-pushups-plan" min="0" step="1" inputmode="numeric" placeholder="–" aria-label="Liegestütze Ziel"></td>
+                <td><input type="number" id="sport-pushups-done" min="0" step="1" inputmode="numeric" placeholder="–" aria-label="Liegestütze erledigt"></td>
+              </tr>
+              <tr>
+                <th scope="row">Sit-Ups</th>
+                <td><input type="number" id="sport-situps-plan" min="0" step="1" inputmode="numeric" placeholder="–" aria-label="Sit-Ups Ziel"></td>
+                <td><input type="number" id="sport-situps-done" min="0" step="1" inputmode="numeric" placeholder="–" aria-label="Sit-Ups erledigt"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="button-row">
+          <button type="submit" class="btn btn-primary">Speichern</button>
+        </div>
+      </form>
+      <div id="sport-others" class="sport-others"></div>
+    </section>
+
     <!-- Einkaufsliste -->
-    <section id="view-shopping" class="view active">
+    <section id="view-shopping" class="view">
       <div class="week-nav">
         <button type="button" class="btn btn-icon" id="prev-week-shopping" aria-label="Vorherige Woche">‹</button>
         <span id="shopping-week-label">Diese Woche</span>
@@ -311,6 +381,27 @@
       </div>
       <div class="button-row" style="margin-top: 0.75rem;">
         <button type="button" class="btn btn-primary" id="confirm-add-to-list">Hinzufügen</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="day-detail-overlay" class="modal-overlay hidden">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h2 id="day-detail-title">Tag</h2>
+        <button type="button" class="icon-btn modal-close" id="close-day-detail" aria-label="Schließen">✕</button>
+      </div>
+      <div class="day-detail-section">
+        <h3 class="section-label">🍽 Essen</h3>
+        <p id="day-detail-meal" class="day-detail-meal">–</p>
+      </div>
+      <div class="day-detail-section">
+        <h3 class="section-label">🏋 Sport</h3>
+        <div id="day-detail-sport" class="day-detail-sport"></div>
+      </div>
+      <div class="button-row modal-actions">
+        <button type="button" class="btn btn-secondary btn-full" id="day-detail-goto-sport">Sport bearbeiten</button>
+        <button type="button" class="btn btn-secondary btn-full" id="day-detail-goto-mealplan">Wochenplan</button>
       </div>
     </div>
   </div>

@@ -1,7 +1,7 @@
 {
-  "name": "Einkauf & Wochenplan",
-  "short_name": "Einkauf",
-  "description": "Einkaufsliste mit Lebensmittel-Datenbank und Wochenplan",
+  "name": "WG Planung",
+  "short_name": "WG Plan",
+  "description": "WG-Planung: Kalender, Einkauf, Wochenplan und Sport",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f4f7f5",

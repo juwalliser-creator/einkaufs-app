@@ -5,9 +5,9 @@
   const PERSON_STORAGE_KEY = "einkaufsapp_person";
 
   const SPORT_EXERCISES = [
-    { key: "pullups", label: "Klimmzüge", planId: "sport-pullups-plan", doneId: "sport-pullups-done" },
-    { key: "pushups", label: "Liegestütze", planId: "sport-pushups-plan", doneId: "sport-pushups-done" },
-    { key: "situps", label: "Sit-Ups", planId: "sport-situps-plan", doneId: "sport-situps-done" },
+    { key: "pullups", label: "Klimmzüge", planId: "sport-plan-pullups", doneId: "sport-done-pullups" },
+    { key: "pushups", label: "Liegestütze", planId: "sport-plan-pushups", doneId: "sport-done-pushups" },
+    { key: "situps", label: "Sit-Ups", planId: "sport-plan-situps", doneId: "sport-done-situps" },
   ];
 
   const DAYS = [
@@ -46,6 +46,8 @@
     "Getränke",
     "Alkohol",
     "Süßigkeiten & Snacks",
+    "Pflege",
+    "Haushalt",
     "Sonstiges",
   ];
 
@@ -74,6 +76,7 @@
   let sportViewDate = null;
   let dayDetailDateKey = null;
   let pendingAssignDateKey = null;
+  let sportModalContext = null;
 
   let foods = [];
   let dishes = [];
@@ -98,8 +101,17 @@
     calendarGrid: document.getElementById("calendar-grid"),
     sportPersonName: document.getElementById("sport-person-name"),
     sportDayLabel: document.getElementById("sport-day-label"),
-    sportForm: document.getElementById("sport-form"),
-    sportFormTitle: document.getElementById("sport-form-title"),
+    sportOpenPlan: document.getElementById("sport-open-plan"),
+    sportOpenDone: document.getElementById("sport-open-done"),
+    sportPlanOverlay: document.getElementById("sport-plan-overlay"),
+    sportPlanTitle: document.getElementById("sport-plan-title"),
+    sportPlanForm: document.getElementById("sport-plan-form"),
+    closeSportPlan: document.getElementById("close-sport-plan"),
+    sportDoneOverlay: document.getElementById("sport-done-overlay"),
+    sportDoneTitle: document.getElementById("sport-done-title"),
+    sportDoneHints: document.getElementById("sport-done-hints"),
+    sportDoneForm: document.getElementById("sport-done-form"),
+    closeSportDone: document.getElementById("close-sport-done"),
     sportOthers: document.getElementById("sport-others"),
     dayDetailOverlay: document.getElementById("day-detail-overlay"),
     dayDetailTitle: document.getElementById("day-detail-title"),
@@ -108,7 +120,7 @@
     closeDayDetail: document.getElementById("close-day-detail"),
     dayDetailPickDish: document.getElementById("day-detail-pick-dish"),
     dayDetailRemoveDish: document.getElementById("day-detail-remove-dish"),
-    dayDetailGotoSport: document.getElementById("day-detail-goto-sport"),
+    dayDetailPlanSport: document.getElementById("day-detail-plan-sport"),
     dishPickerOverlay: document.getElementById("dish-picker-overlay"),
     dishPickerHint: document.getElementById("dish-picker-hint"),
     dishPickerSearch: document.getElementById("dish-picker-search"),
@@ -212,6 +224,14 @@
       n === "avocado" || n === "zitrone"
     ) return "piece";
     if (category === "Backwaren") return "piece";
+    if (category === "Pflege") {
+      if (
+        n.includes("shampoo") || n.includes("duschgel") || n.includes("spülung") ||
+        n.includes("spulung") || n.includes("dusch") || n.includes("seife")
+      ) return "bottle";
+      return "piece";
+    }
+    if (category === "Haushalt") return "package";
     return "weight";
   }
 
@@ -903,25 +923,184 @@
     return "sport-planned";
   }
 
-  function readSportFormIntoEntry() {
-    const entry = emptySportEntry();
+  function readSportPlanForm() {
+    const plan = emptySportValues();
     SPORT_EXERCISES.forEach(function (ex) {
-      const planEl = document.getElementById(ex.planId);
-      const doneEl = document.getElementById(ex.doneId);
-      entry.plan[ex.key] = parseSportNumber(planEl ? planEl.value : "");
-      entry.done[ex.key] = parseSportNumber(doneEl ? doneEl.value : "");
+      const el = document.getElementById(ex.planId);
+      plan[ex.key] = parseSportNumber(el ? el.value : "");
     });
+    return plan;
+  }
+
+  function readSportDoneForm() {
+    const done = emptySportValues();
+    SPORT_EXERCISES.forEach(function (ex) {
+      const el = document.getElementById(ex.doneId);
+      done[ex.key] = parseSportNumber(el ? el.value : "");
+    });
+    return done;
+  }
+
+  function fillSportPlanForm(entry) {
+    const e = migrateSportEntry(entry);
+    SPORT_EXERCISES.forEach(function (ex) {
+      const el = document.getElementById(ex.planId);
+      if (el) el.value = e.plan[ex.key] != null ? String(e.plan[ex.key]) : "";
+    });
+  }
+
+  function fillSportDoneForm(entry) {
+    const e = migrateSportEntry(entry);
+    SPORT_EXERCISES.forEach(function (ex) {
+      const el = document.getElementById(ex.doneId);
+      if (el) el.value = e.done[ex.key] != null ? String(e.done[ex.key]) : "";
+    });
+  }
+
+  function sportPlanHasValues(plan) {
+    return SPORT_EXERCISES.some(function (ex) {
+      return plan[ex.key] != null;
+    });
+  }
+
+  function sportDoneHasValues(done) {
+    return SPORT_EXERCISES.some(function (ex) {
+      return done[ex.key] != null;
+    });
+  }
+
+  function mergeSportEntry(key, personName, planUpdate, doneUpdate) {
+    const entry = getPersonSportEntry(key, personName);
+    if (planUpdate) {
+      SPORT_EXERCISES.forEach(function (ex) {
+        entry.plan[ex.key] = planUpdate[ex.key];
+      });
+    }
+    if (doneUpdate) {
+      SPORT_EXERCISES.forEach(function (ex) {
+        entry.done[ex.key] = doneUpdate[ex.key];
+      });
+    }
     return entry;
   }
 
-  function fillSportFormFromEntry(entry) {
-    const e = migrateSportEntry(entry);
+  function closeSportPlanModal(restoreDayDetail) {
+    els.sportPlanOverlay.classList.add("hidden");
+    els.sportPlanForm.reset();
+    if (restoreDayDetail !== false && dayDetailDateKey) {
+      openDayDetailModal(parseDateKey(dayDetailDateKey));
+    }
+    sportModalContext = null;
+  }
+
+  function closeSportDoneModal(restoreDayDetail) {
+    els.sportDoneOverlay.classList.add("hidden");
+    els.sportDoneForm.reset();
+    els.sportDoneHints.textContent = "";
+    if (restoreDayDetail !== false && dayDetailDateKey) {
+      openDayDetailModal(parseDateKey(dayDetailDateKey));
+    }
+    sportModalContext = null;
+  }
+
+  function openSportPlanModal(date, personName) {
+    const name = normalizeName(personName || getPersonName());
+    if (!name) {
+      showToast("Bitte zuerst deinen Namen eintragen");
+      return;
+    }
+    const key = dateKeyFromDate(date);
+    sportModalContext = {
+      mode: "plan",
+      dateKey: key,
+      personName: name,
+      hadDayDetail: !!dayDetailDateKey,
+    };
+    hideDayDetailOverlay();
+    els.sportPlanTitle.textContent = "Ziele – " + formatLongDate(date);
+    fillSportPlanForm(getPersonSportEntry(key, name));
+    els.sportPlanOverlay.classList.remove("hidden");
+    document.getElementById("sport-plan-pullups").focus();
+  }
+
+  function openSportDoneModal(date, personName) {
+    const name = normalizeName(personName || getPersonName());
+    if (!name) {
+      showToast("Bitte zuerst deinen Namen eintragen");
+      return;
+    }
+    const key = dateKeyFromDate(date);
+    const entry = getPersonSportEntry(key, name);
+    sportModalContext = {
+      mode: "done",
+      dateKey: key,
+      personName: name,
+      hadDayDetail: !!dayDetailDateKey,
+    };
+    hideDayDetailOverlay();
+    els.sportDoneTitle.textContent = "Erledigt – " + formatLongDate(date);
+    const hints = [];
     SPORT_EXERCISES.forEach(function (ex) {
-      const planEl = document.getElementById(ex.planId);
-      const doneEl = document.getElementById(ex.doneId);
-      if (planEl) planEl.value = e.plan[ex.key] != null ? String(e.plan[ex.key]) : "";
-      if (doneEl) doneEl.value = e.done[ex.key] != null ? String(e.done[ex.key]) : "";
+      if (entry.plan[ex.key] != null) {
+        hints.push(ex.label + ": Ziel " + entry.plan[ex.key]);
+      }
     });
+    els.sportDoneHints.textContent = hints.length
+      ? "Deine Ziele: " + hints.join(" · ")
+      : "Noch keine Ziele gesetzt – du kannst trotzdem eintragen, was du geschafft hast.";
+    fillSportDoneForm(entry);
+    els.sportDoneOverlay.classList.remove("hidden");
+    document.getElementById("sport-done-pullups").focus();
+  }
+
+  function handleSportPlanSubmit(event) {
+    event.preventDefault();
+    const ctx = sportModalContext;
+    if (!ctx || ctx.mode !== "plan") return;
+    const plan = readSportPlanForm();
+    if (!sportPlanHasValues(plan)) {
+      showToast("Bitte mindestens ein Ziel eintragen");
+      return;
+    }
+    const entry = mergeSportEntry(ctx.dateKey, ctx.personName, plan, null);
+    if (savePersonSportEntry(ctx.dateKey, ctx.personName, entry)) {
+      const hadDayDetail = ctx.hadDayDetail;
+      closeSportPlanModal(false);
+      showToast("Ziele gespeichert");
+      if (hadDayDetail && dayDetailDateKey) {
+        openDayDetailModal(parseDateKey(dayDetailDateKey));
+      }
+      if (activeView === "sport") renderSportView();
+      if (activeView === "home") renderHomeCalendar();
+    }
+  }
+
+  function handleSportDoneSubmit(event) {
+    event.preventDefault();
+    const ctx = sportModalContext;
+    if (!ctx || ctx.mode !== "done") return;
+    const done = readSportDoneForm();
+    if (!sportDoneHasValues(done)) {
+      showToast("Bitte mindestens einen erledigten Wert eintragen");
+      return;
+    }
+    const entry = mergeSportEntry(ctx.dateKey, ctx.personName, null, done);
+    if (savePersonSportEntry(ctx.dateKey, ctx.personName, entry)) {
+      const hadDayDetail = ctx.hadDayDetail;
+      closeSportDoneModal(false);
+      showToast("Erledigt gespeichert");
+      if (hadDayDetail && dayDetailDateKey) {
+        openDayDetailModal(parseDateKey(dayDetailDateKey));
+      }
+      if (activeView === "sport") renderSportView();
+      if (activeView === "home") renderHomeCalendar();
+    }
+  }
+
+  function isCurrentSportPerson(name) {
+    const mine = getPersonName();
+    if (!mine || !name) return false;
+    return mine.toLowerCase() === name.toLowerCase();
   }
 
   function savePersonSportEntry(key, personName, entry) {
@@ -1011,33 +1190,21 @@
     const date = ensureSportViewDate();
     const key = dateKeyFromDate(date);
     els.sportDayLabel.textContent = formatLongDate(date);
-    els.sportFormTitle.textContent = personName
-      ? "Training – " + personName
-      : "Dein Training (Name oben eintragen)";
 
-    fillSportFormFromEntry(getPersonSportEntry(key, personName));
-    renderSportOthers(key, personName);
-  }
-
-  function handleSportFormSubmit(event) {
-    event.preventDefault();
-    const personName = savePersonName(els.sportPersonName.value);
+    const entry = getPersonSportEntry(key, personName);
+    const hasPlan = sportPlanHasValues(entry.plan);
+    const hasDone = sportDoneHasValues(entry.done);
+    els.sportOpenDone.disabled = !personName;
+    els.sportOpenPlan.disabled = !personName;
     if (!personName) {
-      showToast("Bitte deinen Namen eintragen");
-      els.sportPersonName.focus();
-      return;
+      els.sportOpenPlan.title = "Bitte zuerst deinen Namen eintragen";
+      els.sportOpenDone.title = "Bitte zuerst deinen Namen eintragen";
+    } else {
+      els.sportOpenPlan.title = "";
+      els.sportOpenDone.title = hasPlan ? "" : "Ziele optional – du kannst auch direkt Erledigt eintragen";
     }
-    const key = dateKeyFromDate(ensureSportViewDate());
-    const entry = readSportFormIntoEntry();
-    if (!sportEntryHasData(entry)) {
-      showToast("Bitte mindestens einen Wert eintragen");
-      return;
-    }
-    if (savePersonSportEntry(key, personName, entry)) {
-      showToast("Training gespeichert");
-      renderSportOthers(key, personName);
-      if (activeView === "home") renderHomeCalendar();
-    }
+
+    renderSportOthers(key, personName);
   }
 
   function openSportForDate(date) {
@@ -1064,9 +1231,21 @@
       hasSport = true;
       const block = document.createElement("div");
       block.className = "day-detail-person " + sportStatusClass(entry);
+      if (isCurrentSportPerson(name)) {
+        block.classList.add("day-detail-person-clickable");
+        block.setAttribute("role", "button");
+        block.setAttribute("tabindex", "0");
+        block.setAttribute("aria-label", name + " – Erledigt eintragen");
+      }
       const nameEl = document.createElement("div");
       nameEl.className = "day-detail-person-name";
       nameEl.textContent = name;
+      if (isCurrentSportPerson(name)) {
+        const hint = document.createElement("span");
+        hint.className = "day-detail-tap-hint";
+        hint.textContent = "Tippen für Erledigt";
+        nameEl.appendChild(hint);
+      }
       block.appendChild(nameEl);
       const list = document.createElement("ul");
       list.className = "sport-other-list";
@@ -1077,18 +1256,30 @@
         const li = document.createElement("li");
         let text = ex.label + ": ";
         if (plan != null && done != null) text += done + " / " + plan;
-        else if (done != null) text += done;
+        else if (done != null) text += done + " erledigt";
         else text += "Ziel " + plan;
         li.textContent = text;
         list.appendChild(li);
       });
       block.appendChild(list);
+      if (isCurrentSportPerson(name)) {
+        const openDone = function () {
+          openSportDoneModal(parseDateKey(key), name);
+        };
+        block.addEventListener("click", openDone);
+        block.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openDone();
+          }
+        });
+      }
       els.dayDetailSport.appendChild(block);
     });
     if (!hasSport) {
       const empty = document.createElement("p");
       empty.className = "field-hint";
-      empty.textContent = "Noch kein Training eingetragen";
+      empty.textContent = "Noch keine Ziele – unten auf „Sport planen“ tippen";
       els.dayDetailSport.appendChild(empty);
     }
 
@@ -2346,7 +2537,34 @@
       changeSportViewDay(1);
     });
 
-    els.sportForm.addEventListener("submit", handleSportFormSubmit);
+    els.sportOpenPlan.addEventListener("click", function () {
+      const personName = savePersonName(els.sportPersonName.value);
+      if (!personName) {
+        showToast("Bitte deinen Namen eintragen");
+        els.sportPersonName.focus();
+        return;
+      }
+      openSportPlanModal(ensureSportViewDate(), personName);
+    });
+    els.sportOpenDone.addEventListener("click", function () {
+      const personName = savePersonName(els.sportPersonName.value);
+      if (!personName) {
+        showToast("Bitte deinen Namen eintragen");
+        els.sportPersonName.focus();
+        return;
+      }
+      openSportDoneModal(ensureSportViewDate(), personName);
+    });
+    els.sportPlanForm.addEventListener("submit", handleSportPlanSubmit);
+    els.sportDoneForm.addEventListener("submit", handleSportDoneSubmit);
+    els.closeSportPlan.addEventListener("click", closeSportPlanModal);
+    els.closeSportDone.addEventListener("click", closeSportDoneModal);
+    els.sportPlanOverlay.addEventListener("click", function (e) {
+      if (e.target === els.sportPlanOverlay) closeSportPlanModal();
+    });
+    els.sportDoneOverlay.addEventListener("click", function (e) {
+      if (e.target === els.sportDoneOverlay) closeSportDoneModal();
+    });
     els.sportPersonName.addEventListener("change", function () {
       savePersonName(els.sportPersonName.value);
       renderSportView();
@@ -2359,10 +2577,9 @@
     els.dayDetailOverlay.addEventListener("click", function (e) {
       if (e.target === els.dayDetailOverlay) closeDayDetailModal();
     });
-    els.dayDetailGotoSport.addEventListener("click", function () {
+    els.dayDetailPlanSport.addEventListener("click", function () {
       if (!dayDetailDateKey) return;
-      closeDayDetailModal();
-      openSportForDate(parseDateKey(dayDetailDateKey));
+      openSportPlanModal(parseDateKey(dayDetailDateKey));
     });
     els.dayDetailPickDish.addEventListener("click", function () {
       if (!dayDetailDateKey) return;

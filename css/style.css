@@ -1028,6 +1028,42 @@ textarea:focus {
   margin-bottom: 1rem;
 }
 
+.sport-actions {
+  margin-bottom: 1rem;
+}
+
+.sport-action-buttons {
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sport-plan-overlay input[type="number"],
+.sport-done-overlay input[type="number"],
+#sport-plan-form input[type="number"],
+#sport-done-form input[type="number"] {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 1rem;
+}
+
+.day-detail-person-clickable {
+  cursor: pointer;
+}
+
+.day-detail-person-clickable:active {
+  opacity: 0.85;
+}
+
+.day-detail-tap-hint {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
 .sport-table-wrap {
   overflow-x: auto;
 }

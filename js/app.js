@@ -3495,6 +3495,11 @@
     updateSyncStatus();
     switchView("home");
     if (!initFirebase()) {
+      document.body.classList.remove("auth-locked");
+      const shell = document.getElementById("app-shell");
+      if (shell) shell.classList.remove("hidden");
+      const authOverlay = document.getElementById("auth-overlay");
+      if (authOverlay) authOverlay.classList.add("hidden");
       showSetupOverlay(window.DEFAULT_GROUP_CODE || "FAMILIE");
       showToast("Firebase zuerst einrichten (FIREBASE-SETUP.md)");
       return;

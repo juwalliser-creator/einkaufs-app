@@ -181,6 +181,19 @@ body {
   color: #ffb3b3;
 }
 
+body.auth-locked {
+  background: #ffffff;
+}
+
+body.auth-locked #auth-overlay,
+body.auth-locked #verify-overlay {
+  background: #ffffff;
+}
+
+.app-shell.hidden {
+  display: none !important;
+}
+
 .setup-overlay {
   position: fixed;
   inset: 0;

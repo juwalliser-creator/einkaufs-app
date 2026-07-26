@@ -63,12 +63,19 @@
     }
   }
 
+  function setAppAccess(allowed) {
+    document.body.classList.toggle("auth-locked", !allowed);
+    const shell = document.getElementById("app-shell");
+    if (shell) shell.classList.toggle("hidden", !allowed);
+  }
+
   function hideAllAuthOverlays() {
     if (els.authOverlay) els.authOverlay.classList.add("hidden");
     if (els.verifyOverlay) els.verifyOverlay.classList.add("hidden");
   }
 
   function showAuthPanel(mode) {
+    setAppAccess(false);
     hideAllAuthOverlays();
     if (els.authOverlay) els.authOverlay.classList.remove("hidden");
     const isRegister = mode === "register";
@@ -90,6 +97,7 @@
   }
 
   function showVerifyPanel(email) {
+    setAppAccess(false);
     hideAllAuthOverlays();
     if (els.verifyOverlay) els.verifyOverlay.classList.remove("hidden");
     if (els.verifyEmailDisplay) els.verifyEmailDisplay.textContent = email || "";
@@ -113,6 +121,7 @@
 
   function proceedAsVerifiedUser(user) {
     hideAllAuthOverlays();
+    setAppAccess(true);
     const username = pendingUsername || user.displayName || "";
     pendingUsername = "";
     refreshAuthToken(user).then(function () {
@@ -148,12 +157,13 @@
   function handleAuthStateChange(user) {
     updateSideMenuUser(user);
     if (!user) {
-      hideAllAuthOverlays();
+      setAppAccess(false);
       showAuthPanel("login");
       if (typeof onSignedOut === "function") onSignedOut();
       return;
     }
     if (!user.emailVerified) {
+      setAppAccess(false);
       showVerifyPanel(user.email);
       if (typeof onSignedOut === "function") onSignedOut();
       return;
@@ -295,5 +305,6 @@
     isVerified: isVerified,
     logout: handleLogout,
     showLogin: function () { showAuthPanel("login"); },
+    setAppAccess: setAppAccess,
   };
 })(window);

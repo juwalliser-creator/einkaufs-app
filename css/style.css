@@ -378,13 +378,14 @@ body {
 
 input[type="text"],
 input[type="search"],
+input[type="number"],
 select,
 textarea {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.75rem 0.9rem;
-  font-size: 1rem;
+  font-size: 16px;
   font-family: inherit;
   background: #fff;
 }
@@ -629,7 +630,7 @@ textarea:focus {
   padding: 0.55rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: 10px;
-  font-size: 0.9rem;
+  font-size: 16px;
   font-family: inherit;
 }
 
@@ -1147,7 +1148,7 @@ textarea:focus {
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 10px;
-  font-size: 1rem;
+  font-size: 16px;
 }
 
 .day-detail-person-clickable {
@@ -1201,7 +1202,7 @@ textarea:focus {
   padding: 0.5rem;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 1rem;
+  font-size: 16px;
 }
 
 .sport-others {

@@ -1026,7 +1026,6 @@
     els.sportPlanTitle.textContent = "Ziele – " + formatLongDate(date);
     fillSportPlanForm(getPersonSportEntry(key, name));
     els.sportPlanOverlay.classList.remove("hidden");
-    document.getElementById("sport-plan-pullups").focus();
   }
 
   function openSportDoneModal(date, personName) {
@@ -1056,7 +1055,6 @@
       : "Noch keine Ziele gesetzt – du kannst trotzdem eintragen, was du geschafft hast.";
     fillSportDoneForm(entry);
     els.sportDoneOverlay.classList.remove("hidden");
-    document.getElementById("sport-done-pullups").focus();
   }
 
   function handleSportPlanSubmit(event) {
@@ -1441,7 +1439,6 @@
     els.dishPickerSearch.value = "";
     renderDishPickerList("");
     els.dishPickerOverlay.classList.remove("hidden");
-    els.dishPickerSearch.focus();
   }
 
   function closeDishPickerModal(restoreDayDetail) {
@@ -1908,7 +1905,6 @@
     els.editFoodCategory.value = food.category;
     els.editFoodUnitKind.value = food.unitKind || "weight";
     els.foodEditOverlay.classList.remove("hidden");
-    els.editFoodName.focus();
   }
 
   function closeFoodEditModal() {
@@ -2033,7 +2029,6 @@
     ) ? "1" : "";
     populateUnitSelect(els.addToListUnit, food.unitKind, getDefaultUnit(food.unitKind));
     els.addToListOverlay.classList.remove("hidden");
-    els.addToListAmount.focus();
   }
 
   function closeAddToListModal() {

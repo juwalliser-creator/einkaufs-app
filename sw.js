@@ -1,4 +1,4 @@
-const CACHE_NAME = "einkaufs-app-v33";
+const CACHE_NAME = "einkaufs-app-v34";
 
 self.addEventListener("install", function (event) {
   self.skipWaiting();

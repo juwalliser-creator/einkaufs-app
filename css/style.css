@@ -26,6 +26,7 @@ html, body {
   font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg);
   color: var(--text);
+  touch-action: manipulation;
 }
 
 body {

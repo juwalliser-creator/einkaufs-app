@@ -1,12 +1,12 @@
 :root {
-  --bg: #f4f7f5;
+  --bg: #faf7f3;
   --surface: #ffffff;
-  --primary: #2d6a4f;
-  --primary-dark: #1b4332;
-  --primary-light: #d8f3dc;
+  --primary: #ea580c;
+  --primary-dark: #c2410c;
+  --primary-light: #ffedd5;
   --text: #1a1a1a;
   --text-muted: #5c6670;
-  --border: #dde5df;
+  --border: #e8dfd6;
   --danger: #c1121f;
   --shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   --radius: 14px;
@@ -172,7 +172,7 @@ body {
 }
 
 .sync-status.online {
-  color: #b7e4c7;
+  color: #fdba74;
 }
 
 .sync-status.offline,

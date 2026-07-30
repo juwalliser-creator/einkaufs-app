@@ -1,4 +1,4 @@
-const CACHE_NAME = "einkaufs-app-v45";
+const CACHE_NAME = "einkaufs-app-v46";
 
 const PRECACHE_URLS = [
   "./manifest.json",

@@ -114,6 +114,9 @@
     sportWeekSummary: document.getElementById("sport-week-summary"),
     workTemplatesList: document.getElementById("work-templates-list"),
     workTemplatesEmpty: document.getElementById("work-templates-empty"),
+    workTemplatesSummary: document.getElementById("work-templates-summary"),
+    workTemplatesToggle: document.getElementById("work-templates-toggle"),
+    workTemplatesBody: document.getElementById("work-templates-body"),
     openAddWorkTemplate: document.getElementById("open-add-work-template"),
     workTemplateOverlay: document.getElementById("work-template-overlay"),
     workTemplateTitle: document.getElementById("work-template-title"),
@@ -1222,9 +1225,37 @@
     });
   }
 
+  function updateWorkTemplatesSummary() {
+    if (!els.workTemplatesSummary) return;
+    if (!shiftTemplates.length) {
+      els.workTemplatesSummary.textContent = "Keine Vorlagen";
+      return;
+    }
+    if (shiftTemplates.length <= 4) {
+      els.workTemplatesSummary.textContent = shiftTemplates.map(function (t) {
+        return t.code;
+      }).join(", ");
+      return;
+    }
+    els.workTemplatesSummary.textContent = shiftTemplates.length + " Vorlagen";
+  }
+
+  function setWorkTemplatesExpanded(expanded) {
+    if (!els.workTemplatesBody || !els.workTemplatesToggle) return;
+    els.workTemplatesBody.classList.toggle("hidden", !expanded);
+    els.workTemplatesToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    els.workTemplatesToggle.classList.toggle("is-expanded", expanded);
+  }
+
+  function toggleWorkTemplates() {
+    const expanded = els.workTemplatesToggle.getAttribute("aria-expanded") === "true";
+    setWorkTemplatesExpanded(!expanded);
+  }
+
   function renderWorkTemplatesList() {
     if (!els.workTemplatesList) return;
     els.workTemplatesList.innerHTML = "";
+    updateWorkTemplatesSummary();
     if (!shiftTemplates.length) {
       if (els.workTemplatesEmpty) els.workTemplatesEmpty.classList.remove("hidden");
       return;
@@ -4086,6 +4117,9 @@
       els.openAddWorkTemplate.addEventListener("click", function () {
         openWorkTemplateModal(null);
       });
+    }
+    if (els.workTemplatesToggle) {
+      els.workTemplatesToggle.addEventListener("click", toggleWorkTemplates);
     }
     if (els.workTemplateForm) {
       els.workTemplateForm.addEventListener("submit", handleWorkTemplateSubmit);

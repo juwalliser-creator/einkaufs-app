@@ -196,15 +196,6 @@
 
     <!-- Arbeitsplan -->
     <section id="view-work" class="view">
-      <div class="card work-templates-card">
-        <div class="work-templates-header">
-          <h3 class="section-label work-templates-title">Meine Dienst-Vorlagen</h3>
-          <button type="button" class="btn btn-secondary btn-small" id="open-add-work-template">+ Vorlage</button>
-        </div>
-        <p class="field-hint">Nur in deinem Account sichtbar (z.&nbsp;B. F1, F2). Beim Planen wählst du einen Dienst für den Tag.</p>
-        <ul id="work-templates-list" class="work-templates-list" aria-label="Dienst-Vorlagen"></ul>
-        <p id="work-templates-empty" class="field-hint work-templates-empty">Noch keine Vorlagen – lege z.&nbsp;B. F1 und F2 an.</p>
-      </div>
       <p class="field-hint work-fiete-hint">Fiete sollte nicht länger als 6 Stunden allein sein. Grün = ok, Rot = kritisch.</p>
       <div class="calendar-nav week-nav">
         <button type="button" class="btn btn-icon" id="prev-month-work" aria-label="Vorheriger Monat">‹</button>
@@ -215,6 +206,22 @@
         <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
       </div>
       <div id="work-calendar-grid" class="calendar-grid" role="grid" aria-label="Arbeitsplan Monatskalender"></div>
+
+      <div class="card work-templates-card">
+        <div class="work-templates-header">
+          <button type="button" class="work-templates-toggle" id="work-templates-toggle" aria-expanded="false" aria-controls="work-templates-body">
+            <span class="work-templates-title">Meine Dienst-Vorlagen</span>
+            <span id="work-templates-summary" class="work-templates-summary">Ausklappen</span>
+            <span class="work-templates-chevron" aria-hidden="true">›</span>
+          </button>
+          <button type="button" class="btn btn-secondary btn-small" id="open-add-work-template">+ Vorlage</button>
+        </div>
+        <div id="work-templates-body" class="work-templates-body hidden">
+          <p class="field-hint work-templates-hint">Nur in deinem Account sichtbar (z.&nbsp;B. F1, F2). Beim Planen wählst du einen Dienst für den Tag.</p>
+          <ul id="work-templates-list" class="work-templates-list" aria-label="Dienst-Vorlagen"></ul>
+          <p id="work-templates-empty" class="field-hint work-templates-empty">Noch keine Vorlagen – lege z.&nbsp;B. F1 und F2 an.</p>
+        </div>
+      </div>
     </section>
 
     <!-- Einkaufsliste -->

@@ -1691,6 +1691,28 @@ textarea:focus {
   accent-color: var(--primary);
 }
 
+.auth-link-btn {
+  display: block;
+  margin-top: 0.45rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--primary);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  touch-action: manipulation;
+}
+
+.auth-reset-hint {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
 .auth-submit {
   margin-top: 0.35rem;
   padding-top: 0.75rem;

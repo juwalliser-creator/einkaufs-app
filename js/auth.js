@@ -17,6 +17,11 @@
     els.authTabRegister = document.getElementById("auth-tab-register");
     els.loginForm = document.getElementById("login-form");
     els.registerForm = document.getElementById("register-form");
+    els.resetPasswordForm = document.getElementById("reset-password-form");
+    els.authTabs = document.getElementById("auth-tabs");
+    els.forgotPasswordBtn = document.getElementById("forgot-password-btn");
+    els.resetPasswordEmail = document.getElementById("reset-password-email");
+    els.resetPasswordBack = document.getElementById("reset-password-back");
     els.loginEmail = document.getElementById("login-email");
     els.loginPassword = document.getElementById("login-password");
     els.loginStaySignedIn = document.getElementById("login-stay-signed-in");
@@ -79,20 +84,30 @@
     hideAllAuthOverlays();
     if (els.authOverlay) els.authOverlay.classList.remove("hidden");
     const isRegister = mode === "register";
+    const isReset = mode === "reset";
     if (els.authSubtitle) {
-      els.authSubtitle.textContent = isRegister
-        ? "Erstelle dein Konto für die WG-Planung."
-        : "Melde dich an, um deine Gruppe zu nutzen.";
+      if (isReset) {
+        els.authSubtitle.textContent = "Setze dein Passwort per E-Mail zurück.";
+      } else {
+        els.authSubtitle.textContent = isRegister
+          ? "Erstelle dein Konto für die WG-Planung."
+          : "Melde dich an, um deine Gruppe zu nutzen.";
+      }
     }
-    if (els.loginForm) els.loginForm.classList.toggle("hidden", isRegister);
-    if (els.registerForm) els.registerForm.classList.toggle("hidden", !isRegister);
+    if (els.authTabs) els.authTabs.classList.toggle("hidden", isReset);
+    if (els.loginForm) els.loginForm.classList.toggle("hidden", isRegister || isReset);
+    if (els.registerForm) els.registerForm.classList.toggle("hidden", !isRegister || isReset);
+    if (els.resetPasswordForm) els.resetPasswordForm.classList.toggle("hidden", !isReset);
     if (els.authTabLogin) {
-      els.authTabLogin.classList.toggle("active", !isRegister);
-      els.authTabLogin.setAttribute("aria-selected", isRegister ? "false" : "true");
+      els.authTabLogin.classList.toggle("active", !isRegister && !isReset);
+      els.authTabLogin.setAttribute("aria-selected", isRegister || isReset ? "false" : "true");
     }
     if (els.authTabRegister) {
       els.authTabRegister.classList.toggle("active", isRegister);
       els.authTabRegister.setAttribute("aria-selected", isRegister ? "true" : "false");
+    }
+    if (isReset && els.resetPasswordEmail && els.loginEmail && els.loginEmail.value.trim()) {
+      els.resetPasswordEmail.value = els.loginEmail.value.trim();
     }
   }
 
@@ -261,6 +276,29 @@
     });
   }
 
+  function handleForgotPasswordClick() {
+    showAuthPanel("reset");
+    if (els.resetPasswordEmail) {
+      els.resetPasswordEmail.focus();
+    }
+  }
+
+  function handleResetPasswordSubmit(event) {
+    event.preventDefault();
+    const email = els.resetPasswordEmail.value.trim();
+    if (!email) {
+      showToast("Bitte E-Mail eingeben");
+      return;
+    }
+    auth.sendPasswordResetEmail(email).then(function () {
+      showToast("Link gesendet – bitte E-Mail prüfen (auch Spam)");
+      showAuthPanel("login");
+      if (els.loginEmail) els.loginEmail.value = email;
+    }).catch(function (error) {
+      showToast(authErrorMessage(error));
+    });
+  }
+
   function bindEvents() {
     if (els.authTabLogin) {
       els.authTabLogin.addEventListener("click", function () {
@@ -274,6 +312,13 @@
     }
     if (els.loginForm) els.loginForm.addEventListener("submit", handleLoginSubmit);
     if (els.registerForm) els.registerForm.addEventListener("submit", handleRegisterSubmit);
+    if (els.resetPasswordForm) els.resetPasswordForm.addEventListener("submit", handleResetPasswordSubmit);
+    if (els.forgotPasswordBtn) els.forgotPasswordBtn.addEventListener("click", handleForgotPasswordClick);
+    if (els.resetPasswordBack) {
+      els.resetPasswordBack.addEventListener("click", function () {
+        showAuthPanel("login");
+      });
+    }
     if (els.resendVerificationBtn) els.resendVerificationBtn.addEventListener("click", handleResendVerification);
     if (els.checkVerificationBtn) els.checkVerificationBtn.addEventListener("click", handleCheckVerification);
     if (els.verifyLogoutBtn) els.verifyLogoutBtn.addEventListener("click", handleLogout);

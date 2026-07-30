@@ -20,7 +20,7 @@
         <h2 class="auth-brand">WG Planung</h2>
         <p class="auth-subtitle" id="auth-subtitle">Melde dich an, um deine Gruppe zu nutzen.</p>
       </div>
-      <div class="auth-tabs" role="tablist" aria-label="Anmeldung">
+      <div class="auth-tabs" role="tablist" aria-label="Anmeldung" id="auth-tabs">
         <button type="button" class="auth-tab active" id="auth-tab-login" role="tab" aria-selected="true">Anmelden</button>
         <button type="button" class="auth-tab" id="auth-tab-register" role="tab" aria-selected="false">Registrieren</button>
       </div>
@@ -33,12 +33,23 @@
         <div class="auth-field">
           <label for="login-password" class="auth-label">Passwort</label>
           <input type="password" class="auth-input" id="login-password" placeholder="••••••••" autocomplete="current-password" required>
+          <button type="button" class="auth-link-btn" id="forgot-password-btn">Passwort vergessen?</button>
         </div>
         <label class="auth-checkbox">
           <input type="checkbox" id="login-stay-signed-in" checked>
           <span>Angemeldet bleiben</span>
         </label>
         <button type="submit" class="btn btn-primary btn-full auth-submit">Anmelden</button>
+      </form>
+
+      <form id="reset-password-form" class="auth-panel auth-form hidden">
+        <p class="auth-reset-hint">Gib deine E-Mail ein. Du erhältst einen Link zum neuen Passwort (Spam-Ordner prüfen).</p>
+        <div class="auth-field">
+          <label for="reset-password-email" class="auth-label">E-Mail</label>
+          <input type="email" class="auth-input" id="reset-password-email" placeholder="deine@email.de" autocomplete="email" inputmode="email" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full auth-submit">Link senden</button>
+        <button type="button" class="btn btn-secondary btn-full" id="reset-password-back">Zurück zur Anmeldung</button>
       </form>
 
       <form id="register-form" class="auth-panel auth-form hidden">

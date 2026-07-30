@@ -108,6 +108,10 @@
       <span class="menu-icon" aria-hidden="true">🏋</span>
       <span>Sport</span>
     </button>
+    <button type="button" class="menu-btn" data-view="work">
+      <span class="menu-icon" aria-hidden="true">💼</span>
+      <span>Arbeitsplan</span>
+    </button>
     <button type="button" class="menu-btn" data-view="shopping">
       <span class="menu-icon" aria-hidden="true">🛒</span>
       <span>Liste</span>
@@ -177,6 +181,23 @@
         </div>
       </form>
       <div id="sport-others" class="sport-others"></div>
+    </section>
+
+    <!-- Arbeitsplan -->
+    <section id="view-work" class="view">
+      <div class="card work-person-card">
+        <label for="work-person-name">Dein Name</label>
+        <input type="text" id="work-person-name" placeholder="z.B. Max" autocomplete="name" maxlength="32">
+        <p class="field-hint">Wird auf diesem Gerät gespeichert. Trage nur deine eigenen Schichten ein.</p>
+      </div>
+      <div class="week-nav">
+        <button type="button" class="btn btn-icon" id="prev-week-work" aria-label="Vorherige Woche">‹</button>
+        <span id="work-week-label">Diese Woche</span>
+        <button type="button" class="btn btn-icon" id="next-week-work" aria-label="Nächste Woche">›</button>
+        <button type="button" class="btn btn-secondary btn-small" id="work-week-today" title="Zur aktuellen Woche">Heute</button>
+      </div>
+      <p class="field-hint work-fiete-hint">Fiete sollte nicht länger als 6 Stunden allein sein (niemand zuhause).</p>
+      <div id="work-week-days" class="work-week-days" aria-label="Wochenübersicht Arbeitsplan"></div>
     </section>
 
     <!-- Einkaufsliste -->
@@ -536,6 +557,26 @@
         <input type="number" id="sport-done-situps" min="0" step="1" inputmode="numeric" placeholder="Geschafft">
         <div class="button-row" style="margin-top: 0.75rem;">
           <button type="submit" class="btn btn-primary">Erledigt speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="work-shift-overlay" class="modal-overlay hidden">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h2 id="work-shift-title">Schicht eintragen</h2>
+        <button type="button" class="icon-btn modal-close" id="close-work-shift" aria-label="Schließen">✕</button>
+      </div>
+      <p id="work-shift-date-label" class="modal-hint"></p>
+      <form id="work-shift-form">
+        <label for="work-shift-start">Von</label>
+        <input type="time" id="work-shift-start" required>
+        <label for="work-shift-end" class="field-label" style="margin-top: 0.75rem;">Bis</label>
+        <input type="time" id="work-shift-end" required>
+        <div class="button-row" style="margin-top: 0.75rem;">
+          <button type="submit" class="btn btn-primary">Speichern</button>
+          <button type="button" class="btn btn-danger-outline hidden" id="delete-work-shift">Löschen</button>
         </div>
       </form>
     </div>

@@ -4,6 +4,9 @@
   const ROOM_STORAGE_KEY = "einkaufsapp_room";
   const PERSON_STORAGE_KEY = "einkaufsapp_person";
   const SHOPPING_WEEK_OFFSET_KEY = "einkaufsapp_shopping_week_offset";
+  const WORK_WEEK_OFFSET_KEY = "einkaufsapp_work_week_offset";
+  const FIETE_MAX_ALONE_MINUTES = 360;
+  const DOG_NAME = "Fiete";
   const OFFLINE_CACHE_KEY = "einkaufsapp_offline_cache";
 
   const SPORT_EXERCISES = [
@@ -41,6 +44,7 @@
   const VIEW_META = {
     home: { title: "Start" },
     sport: { title: "Sport" },
+    work: { title: "Arbeitsplan" },
     shopping: { title: "Einkaufsliste" },
     foods: { title: "Lebensmittel" },
     dishes: { title: "Gerichte" },
@@ -67,9 +71,12 @@
   let weeklyShopping = {};
   let mealPlan = {};
   let sportLog = {};
+  let workShifts = {};
   let staples = [];
   let shoppingWeekOffset = 0;
+  let workWeekOffset = 0;
   let isOfflineMode = false;
+  let workShiftModalContext = null;
 
   let dishFilter = { diet: null, temp: null };
 
@@ -101,6 +108,17 @@
     closeSportDone: document.getElementById("close-sport-done"),
     sportOthers: document.getElementById("sport-others"),
     sportWeekSummary: document.getElementById("sport-week-summary"),
+    workPersonName: document.getElementById("work-person-name"),
+    workWeekLabel: document.getElementById("work-week-label"),
+    workWeekDays: document.getElementById("work-week-days"),
+    workShiftOverlay: document.getElementById("work-shift-overlay"),
+    workShiftTitle: document.getElementById("work-shift-title"),
+    workShiftDateLabel: document.getElementById("work-shift-date-label"),
+    workShiftForm: document.getElementById("work-shift-form"),
+    workShiftStart: document.getElementById("work-shift-start"),
+    workShiftEnd: document.getElementById("work-shift-end"),
+    closeWorkShift: document.getElementById("close-work-shift"),
+    deleteWorkShift: document.getElementById("delete-work-shift"),
     dayDetailOverlay: document.getElementById("day-detail-overlay"),
     dayDetailTitle: document.getElementById("day-detail-title"),
     dayDetailMeal: document.getElementById("day-detail-meal"),
@@ -431,6 +449,24 @@
     }
   }
 
+  function loadWorkWeekOffset() {
+    try {
+      const value = localStorage.getItem(WORK_WEEK_OFFSET_KEY);
+      const parsed = parseInt(value, 10);
+      return isFinite(parsed) ? parsed : 0;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  function saveWorkWeekOffset(offset) {
+    try {
+      localStorage.setItem(WORK_WEEK_OFFSET_KEY, String(offset));
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
   function getShoppingWeekKey() {
     return weekPlanKey(getWeekStart(shoppingWeekOffset));
   }
@@ -484,6 +520,7 @@
       weeklyShopping: weeklyShopping,
       mealPlan: mealPlan,
       sportLog: sportLog,
+      workShifts: workShifts,
       staples: staples,
     };
   }
@@ -503,6 +540,7 @@
     }
     if (data.mealPlan && typeof data.mealPlan === "object") mealPlan = data.mealPlan;
     if (data.sportLog && typeof data.sportLog === "object") sportLog = data.sportLog;
+    if (data.workShifts && typeof data.workShifts === "object") workShifts = data.workShifts;
     if (Array.isArray(data.staples)) {
       staples = data.staples.map(migrateStaple).filter(Boolean);
     } else {
@@ -792,6 +830,7 @@
     }
     if (data.mealPlan && typeof data.mealPlan === "object") mealPlan = data.mealPlan;
     if (data.sportLog && typeof data.sportLog === "object") sportLog = data.sportLog;
+    if (data.workShifts && typeof data.workShifts === "object") workShifts = data.workShifts;
     if (Array.isArray(data.staples)) {
       staples = data.staples.map(migrateStaple).filter(Boolean);
     } else {
@@ -880,6 +919,7 @@
             weeklyShopping = {};
             mealPlan = {};
             sportLog = {};
+            workShifts = {};
             staples = [];
             isInitialized = true;
             updateFoodNameSuggestions();
@@ -890,6 +930,7 @@
               weeklyShopping: {},
               mealPlan: {},
               sportLog: {},
+              workShifts: {},
               staples: [],
               [FOODS_DB_RESET_KEY]: true,
               updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -938,6 +979,7 @@
         weeklyShopping: weeklyShopping,
         mealPlan: mealPlan,
         sportLog: sportLog,
+        workShifts: workShifts,
         staples: staples,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       },
@@ -1049,6 +1091,348 @@
       /* ignore */
     }
     return clean;
+  }
+
+  function migrateWorkShift(shift) {
+    if (!shift || typeof shift !== "object") return null;
+    const personName = normalizeName(shift.personName || "");
+    const start = shift.start || "";
+    const end = shift.end || "";
+    if (!personName || !/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) return null;
+    if (parseTimeToMinutes(end) <= parseTimeToMinutes(start)) return null;
+    return {
+      id: shift.id || uid(),
+      personName: personName,
+      start: start,
+      end: end,
+    };
+  }
+
+  function parseTimeToMinutes(timeStr) {
+    const parts = timeStr.split(":");
+    return Number(parts[0]) * 60 + Number(parts[1]);
+  }
+
+  function minutesToTimeString(minutes) {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+  }
+
+  function formatDurationMinutes(minutes) {
+    if (minutes <= 0) return "0 min";
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours === 0) return mins + " min";
+    if (mins === 0) return hours + " h";
+    if (mins === 30) return hours + ",5 h";
+    return hours + " h " + mins + " min";
+  }
+
+  function getWorkShiftsForDay(dateKey) {
+    return (workShifts[dateKey] || []).map(migrateWorkShift).filter(Boolean);
+  }
+
+  function mergeTimeIntervals(intervals) {
+    if (!intervals.length) return [];
+    const sorted = intervals.slice().sort(function (a, b) {
+      return a.start - b.start;
+    });
+    const merged = [{ start: sorted[0].start, end: sorted[0].end }];
+    for (let i = 1; i < sorted.length; i += 1) {
+      const last = merged[merged.length - 1];
+      const current = sorted[i];
+      if (current.start <= last.end) {
+        last.end = Math.max(last.end, current.end);
+      } else {
+        merged.push({ start: current.start, end: current.end });
+      }
+    }
+    return merged;
+  }
+
+  function isMinuteInIntervals(minute, intervals) {
+    return intervals.some(function (interval) {
+      return minute >= interval.start && minute < interval.end;
+    });
+  }
+
+  function analyzeFieteAlone(dateKey) {
+    const shifts = getWorkShiftsForDay(dateKey);
+    if (!shifts.length) {
+      return { maxAloneMinutes: 0, critical: false, worstInterval: null };
+    }
+    const persons = [];
+    shifts.forEach(function (shift) {
+      if (persons.indexOf(shift.personName) === -1) persons.push(shift.personName);
+    });
+    if (persons.length < 2) {
+      return { maxAloneMinutes: 0, critical: false, worstInterval: null };
+    }
+
+    const awayByPerson = {};
+    persons.forEach(function (personName) {
+      const intervals = shifts
+        .filter(function (shift) { return shift.personName === personName; })
+        .map(function (shift) {
+          return {
+            start: parseTimeToMinutes(shift.start),
+            end: parseTimeToMinutes(shift.end),
+          };
+        });
+      awayByPerson[personName] = mergeTimeIntervals(intervals);
+    });
+
+    let maxAlone = 0;
+    let worstStart = null;
+    let worstEnd = null;
+    let currentStart = null;
+
+    for (let minute = 0; minute < 1440; minute += 1) {
+      const allAway = persons.every(function (personName) {
+        return isMinuteInIntervals(minute, awayByPerson[personName]);
+      });
+      if (allAway) {
+        if (currentStart === null) currentStart = minute;
+      } else if (currentStart !== null) {
+        const duration = minute - currentStart;
+        if (duration > maxAlone) {
+          maxAlone = duration;
+          worstStart = currentStart;
+          worstEnd = minute;
+        }
+        currentStart = null;
+      }
+    }
+    if (currentStart !== null) {
+      const duration = 1440 - currentStart;
+      if (duration > maxAlone) {
+        maxAlone = duration;
+        worstStart = currentStart;
+        worstEnd = 1440;
+      }
+    }
+
+    return {
+      maxAloneMinutes: maxAlone,
+      critical: maxAlone > FIETE_MAX_ALONE_MINUTES,
+      worstInterval: worstStart === null ? null : {
+        start: minutesToTimeString(worstStart),
+        end: worstEnd === 1440 ? "24:00" : minutesToTimeString(worstEnd),
+      },
+    };
+  }
+
+  function getFieteStatusText(analysis) {
+    if (!analysis.maxAloneMinutes) {
+      return DOG_NAME + " ok";
+    }
+    let text = DOG_NAME + " max. allein: " + formatDurationMinutes(analysis.maxAloneMinutes);
+    if (analysis.critical && analysis.worstInterval) {
+      text = "⚠️ " + DOG_NAME + " wäre bis zu " + formatDurationMinutes(analysis.maxAloneMinutes) +
+        " allein (" + analysis.worstInterval.start + "–" + analysis.worstInterval.end + "). Bitte Absprache treffen!";
+    }
+    return text;
+  }
+
+  function getWorkWeekLabelText() {
+    const weekStart = getWeekStart(workWeekOffset);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    if (workWeekOffset === 0) return "Diese Woche";
+    if (workWeekOffset === 1) return "Nächste Woche";
+    if (workWeekOffset === -1) return "Letzte Woche";
+    return formatDate(weekStart) + " – " + formatDate(weekEnd);
+  }
+
+  function changeWorkWeekOffset(delta) {
+    workWeekOffset += delta;
+    saveWorkWeekOffset(workWeekOffset);
+    renderActiveView();
+  }
+
+  function resetWorkWeekOffset() {
+    workWeekOffset = 0;
+    saveWorkWeekOffset(0);
+    renderActiveView();
+  }
+
+  function isCurrentWorkPerson(personName) {
+    const mine = getPersonName();
+    return mine && normalizeName(personName) === mine;
+  }
+
+  function saveWorkShift(dateKey, shiftData) {
+    if (!workShifts[dateKey]) workShifts[dateKey] = [];
+    const migrated = migrateWorkShift(shiftData);
+    if (!migrated) {
+      showToast("Bitte gültige Zeiten eingeben (Ende nach Start)");
+      return false;
+    }
+    const existingIndex = workShifts[dateKey].findIndex(function (shift) {
+      return shift.id === migrated.id;
+    });
+    if (existingIndex === -1) {
+      workShifts[dateKey].push(migrated);
+    } else {
+      workShifts[dateKey][existingIndex] = migrated;
+    }
+    workShifts[dateKey].sort(function (a, b) {
+      return parseTimeToMinutes(a.start) - parseTimeToMinutes(b.start);
+    });
+    if (!workShifts[dateKey].length) delete workShifts[dateKey];
+    persistAll();
+    return true;
+  }
+
+  function deleteWorkShift(dateKey, shiftId) {
+    if (!workShifts[dateKey]) return;
+    workShifts[dateKey] = workShifts[dateKey].filter(function (shift) {
+      return shift.id !== shiftId;
+    });
+    if (!workShifts[dateKey].length) delete workShifts[dateKey];
+    persistAll();
+  }
+
+  function openWorkShiftModal(dateKey, shiftId) {
+    const personName = savePersonName(els.workPersonName ? els.workPersonName.value : "") || getPersonName();
+    if (!personName) {
+      showToast("Bitte zuerst deinen Namen eintragen");
+      if (els.workPersonName) els.workPersonName.focus();
+      return;
+    }
+    workShiftModalContext = { dateKey: dateKey, shiftId: shiftId || null };
+    const date = parseDateKey(dateKey);
+    els.workShiftDateLabel.textContent = formatLongDate(date);
+    if (shiftId) {
+      const shift = getWorkShiftsForDay(dateKey).find(function (s) { return s.id === shiftId; });
+      if (!shift || !isCurrentWorkPerson(shift.personName)) {
+        showToast("Nur eigene Schichten bearbeiten");
+        return;
+      }
+      els.workShiftTitle.textContent = "Schicht bearbeiten";
+      els.workShiftStart.value = shift.start;
+      els.workShiftEnd.value = shift.end;
+      els.deleteWorkShift.classList.remove("hidden");
+    } else {
+      els.workShiftTitle.textContent = "Schicht eintragen";
+      els.workShiftStart.value = "08:00";
+      els.workShiftEnd.value = "17:00";
+      els.deleteWorkShift.classList.add("hidden");
+    }
+    els.workShiftOverlay.classList.remove("hidden");
+  }
+
+  function closeWorkShiftModal() {
+    workShiftModalContext = null;
+    els.workShiftOverlay.classList.add("hidden");
+    els.workShiftForm.reset();
+    els.deleteWorkShift.classList.add("hidden");
+  }
+
+  function handleWorkShiftSubmit(event) {
+    event.preventDefault();
+    if (!workShiftModalContext) return;
+    const personName = savePersonName(els.workPersonName.value) || getPersonName();
+    if (!personName) {
+      showToast("Bitte deinen Namen eintragen");
+      return;
+    }
+    const shiftData = {
+      id: workShiftModalContext.shiftId || uid(),
+      personName: personName,
+      start: els.workShiftStart.value,
+      end: els.workShiftEnd.value,
+    };
+    if (saveWorkShift(workShiftModalContext.dateKey, shiftData)) {
+      closeWorkShiftModal();
+      renderActiveView();
+      showToast("Schicht gespeichert");
+    }
+  }
+
+  function handleDeleteWorkShift() {
+    if (!workShiftModalContext || !workShiftModalContext.shiftId) return;
+    deleteWorkShift(workShiftModalContext.dateKey, workShiftModalContext.shiftId);
+    closeWorkShiftModal();
+    renderActiveView();
+    showToast("Schicht gelöscht");
+  }
+
+  function renderWorkView() {
+    if (els.workPersonName) {
+      els.workPersonName.value = getPersonName();
+    }
+    els.workWeekLabel.textContent = getWorkWeekLabelText();
+    els.workWeekDays.innerHTML = "";
+    const weekStart = getWeekStart(workWeekOffset);
+    const dayNames = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+    for (let i = 0; i < 7; i += 1) {
+      const dayDate = new Date(weekStart);
+      dayDate.setDate(weekStart.getDate() + i);
+      const dateKey = dateKeyFromDate(dayDate);
+      const shifts = getWorkShiftsForDay(dateKey);
+      const analysis = analyzeFieteAlone(dateKey);
+
+      const card = document.createElement("article");
+      card.className = "card work-day-card" + (analysis.critical ? " work-day-critical" : "");
+
+      const header = document.createElement("div");
+      header.className = "work-day-header";
+      const title = document.createElement("h3");
+      title.className = "work-day-title";
+      title.textContent = dayNames[i] + ", " + formatDate(dayDate);
+      header.appendChild(title);
+
+      const addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "btn btn-secondary btn-small";
+      addBtn.textContent = "+ Schicht";
+      addBtn.addEventListener("click", function () {
+        openWorkShiftModal(dateKey, null);
+      });
+      header.appendChild(addBtn);
+      card.appendChild(header);
+
+      const shiftList = document.createElement("ul");
+      shiftList.className = "work-shift-list";
+      if (!shifts.length) {
+        const empty = document.createElement("li");
+        empty.className = "work-shift-empty";
+        empty.textContent = "Keine Schichten";
+        shiftList.appendChild(empty);
+      } else {
+        shifts.forEach(function (shift) {
+          const li = document.createElement("li");
+          li.className = "work-shift-row";
+          const label = document.createElement("span");
+          label.className = "work-shift-label";
+          label.textContent = shift.personName + ": " + shift.start + " – " + shift.end;
+          li.appendChild(label);
+          if (isCurrentWorkPerson(shift.personName)) {
+            const editBtn = document.createElement("button");
+            editBtn.type = "button";
+            editBtn.className = "icon-btn";
+            editBtn.textContent = "✎";
+            editBtn.setAttribute("aria-label", "Schicht bearbeiten");
+            editBtn.addEventListener("click", function () {
+              openWorkShiftModal(dateKey, shift.id);
+            });
+            li.appendChild(editBtn);
+          }
+          shiftList.appendChild(li);
+        });
+      }
+      card.appendChild(shiftList);
+
+      const fiete = document.createElement("p");
+      fiete.className = "work-fiete-status" + (analysis.critical ? " work-fiete-critical" : "");
+      fiete.textContent = getFieteStatusText(analysis);
+      card.appendChild(fiete);
+
+      els.workWeekDays.appendChild(card);
+    }
   }
 
   function parseSportNumber(value) {
@@ -2031,6 +2415,9 @@
       btn.setAttribute("role", "gridcell");
       if (!inMonth) btn.classList.add("outside-month");
       if (key === todayKey) btn.classList.add("is-today");
+
+      const fieteAnalysis = analyzeFieteAlone(key);
+      if (fieteAnalysis.critical) btn.classList.add("calendar-cell-critical");
 
       const dayNum = document.createElement("span");
       dayNum.className = "calendar-day-num";
@@ -3108,6 +3495,7 @@
   function renderActiveView() {
     if (activeView === "home") renderHomeCalendar();
     if (activeView === "sport") renderSportView();
+    if (activeView === "work") renderWorkView();
     if (activeView === "shopping") renderShoppingList();
     if (activeView === "foods") renderFoods();
     if (activeView === "dishes") renderDishes();
@@ -3360,6 +3748,34 @@
     });
     document.getElementById("shopping-week-today").addEventListener("click", resetShoppingWeekOffset);
 
+    document.getElementById("prev-week-work").addEventListener("click", function () {
+      changeWorkWeekOffset(-1);
+    });
+    document.getElementById("next-week-work").addEventListener("click", function () {
+      changeWorkWeekOffset(1);
+    });
+    document.getElementById("work-week-today").addEventListener("click", resetWorkWeekOffset);
+    if (els.workPersonName) {
+      els.workPersonName.addEventListener("change", function () {
+        savePersonName(els.workPersonName.value);
+        renderActiveView();
+      });
+    }
+    if (els.workShiftForm) {
+      els.workShiftForm.addEventListener("submit", handleWorkShiftSubmit);
+    }
+    if (els.closeWorkShift) {
+      els.closeWorkShift.addEventListener("click", closeWorkShiftModal);
+    }
+    if (els.deleteWorkShift) {
+      els.deleteWorkShift.addEventListener("click", handleDeleteWorkShift);
+    }
+    if (els.workShiftOverlay) {
+      els.workShiftOverlay.addEventListener("click", function (e) {
+        if (e.target === els.workShiftOverlay) closeWorkShiftModal();
+      });
+    }
+
     if (els.addStapleForm) {
       els.addStapleForm.addEventListener("submit", handleAddStaple);
     }
@@ -3517,12 +3933,14 @@
 
   function startApp() {
     shoppingWeekOffset = loadShoppingWeekOffset();
+    workWeekOffset = loadWorkWeekOffset();
     window.showAppToast = showToast;
     bindEvents();
     if (els.stapleUnit) {
       populateUnitSelect(els.stapleUnit, "weight", "g");
     }
     els.sportPersonName.value = getPersonName();
+    if (els.workPersonName) els.workPersonName.value = getPersonName();
     setSportViewDate(new Date());
     updateSyncStatus();
     switchView("home");

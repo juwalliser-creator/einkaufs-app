@@ -431,14 +431,79 @@ textarea:focus {
 .shopping-groups {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
 }
 
-.shopping-category-group h3 {
-  margin: 0 0 0.5rem;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.shopping-flat-list {
+  gap: 0.45rem;
+}
+
+.shopping-item-row {
+  padding: 0.65rem 0.75rem;
+  gap: 0.5rem;
+}
+
+.shopping-item-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.shopping-status-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.shopping-status-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-family: inherit;
+}
+
+.shopping-status-done {
+  color: #bdbdbd;
+  border-color: #e0e0e0;
+}
+
+.shopping-status-done.active {
+  color: #fff;
+  background: #2e7d32;
+  border-color: #2e7d32;
+}
+
+.shopping-status-unavailable {
+  color: #bdbdbd;
+  border-color: #e0e0e0;
+}
+
+.shopping-status-unavailable.active {
+  color: #fff;
+  background: #c62828;
+  border-color: #c62828;
+}
+
+.item-row.status-done,
+.item-row.status-unavailable {
+  opacity: 0.7;
+}
+
+.item-row.status-done .shopping-item-label,
+.item-row.status-unavailable .shopping-item-label {
+  text-decoration: line-through;
+}
+
+.item-row.status-unavailable .shopping-item-label {
   color: var(--text-muted);
 }
 
@@ -1405,30 +1470,6 @@ textarea:focus {
 
 .staples-empty {
   margin: 0 0 0.75rem;
-}
-
-/* Einkaufsliste: Menge direkt bearbeiten */
-.shopping-inline-row {
-  display: grid;
-  grid-template-columns: 72px 64px minmax(0, 1fr);
-  gap: 0.4rem;
-  align-items: center;
-}
-
-.shopping-qty-input,
-.shopping-unit-select {
-  width: 100%;
-  min-width: 0;
-  padding: 0.45rem 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 16px;
-  font-family: inherit;
-  background: #fff;
-}
-
-.shopping-inline-name {
-  min-width: 0;
 }
 
 /* Sport-Wochenübersicht */

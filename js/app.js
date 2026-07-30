@@ -35,24 +35,6 @@
 
   const FOODS_DB_RESET_KEY = "foodsDbUserResetV1";
 
-  const FOOD_CATEGORY_ORDER = [
-    "Obst & Gemüse",
-    "Backwaren",
-    "Milchprodukte",
-    "Fleisch & Fisch",
-    "Teigwaren",
-    "Vorrat",
-    "Konserven",
-    "Tiefkühl",
-    "Gewürze & Kräuter",
-    "Getränke",
-    "Alkohol",
-    "Süßigkeiten & Snacks",
-    "Pflege",
-    "Haushalt",
-    "Sonstiges",
-  ];
-
   let pendingAddToListFoodId = null;
   let selectedFoodId = null;
 
@@ -371,11 +353,19 @@
     if (amount != null && (!isFinite(amount) || amount <= 0)) amount = null;
     let unit = item.unit || null;
     if (unit && !unitKindFromUnit(unit)) unit = null;
+    let status = "open";
+    if (item.status === "done" || item.status === "unavailable" || item.status === "open") {
+      status = item.status;
+    } else if (item.checked) {
+      status = "done";
+    }
+    const addedAt = item.addedAt || Date.now();
     return {
       id: item.id || uid(),
       name: item.name || "",
-      checked: !!item.checked,
-      addedAt: item.addedAt || Date.now(),
+      status: status,
+      statusAt: item.statusAt || (status !== "open" ? addedAt : null),
+      addedAt: addedAt,
       source: item.source || "manual",
       foodId: item.foodId || null,
       amount: amount,
@@ -385,6 +375,20 @@
       dayKey: item.dayKey || null,
       dayLabel: item.dayLabel || null,
     };
+  }
+
+  function normalizeShoppingStatus(item) {
+    if (!item) return "open";
+    if (item.status === "done" || item.status === "unavailable" || item.status === "open") {
+      return item.status;
+    }
+    return item.checked ? "done" : "open";
+  }
+
+  function shoppingStatusSortRank(status) {
+    if (status === "done") return 1;
+    if (status === "unavailable") return 2;
+    return 0;
   }
 
   function migrateStaple(item) {
@@ -2326,7 +2330,7 @@
       name: food.name,
       amount: amount,
       unit: unit,
-      checked: false,
+      status: "open",
       addedAt: Date.now(),
       source: "manual",
     });
@@ -2367,7 +2371,7 @@
     const list = getWeeklyList(weekKey);
     const exists = list.some(function (item) {
       return (
-        !item.checked &&
+        normalizeShoppingStatus(item) === "open" &&
         item.source === "mealplan" &&
         item.dishId === dishId &&
         item.dayKey === dayKey &&
@@ -2381,7 +2385,7 @@
       foodId: migrated.foodId,
       amount: migrated.amount,
       unit: migrated.unit,
-      checked: false,
+      status: "open",
       addedAt: Date.now(),
       source: "mealplan",
       dishId: dishId,
@@ -2427,30 +2431,42 @@
           unitKind: item.unit ? unitKindFromUnit(item.unit) : null,
           baseTotal: 0,
           hasAmount: false,
-          checked: true,
           itemIds: [],
-          sources: [],
+          statuses: [],
+          addedAts: [],
+          statusAts: [],
         };
       }
       const group = groups[key];
       group.itemIds.push(item.id);
-      if (!item.checked) group.checked = false;
+      group.statuses.push(normalizeShoppingStatus(item));
+      group.addedAts.push(item.addedAt || 0);
+      group.statusAts.push(item.statusAt || item.addedAt || 0);
       const base = toBaseAmount(item.amount, item.unit);
       if (base != null && group.unitKind) {
         group.baseTotal += base;
         group.hasAmount = true;
       }
-      if (item.source === "mealplan" && item.dishName && item.dayLabel) {
-        const sourceLabel = item.dishName + ", " + item.dayLabel;
-        if (item.amount != null && item.unit) {
-          group.sources.push(formatQuantity(item.amount, item.unit) + " für " + sourceLabel);
-        } else {
-          group.sources.push("für " + sourceLabel);
-        }
-      }
     });
     return Object.keys(groups).map(function (key) {
-      return groups[key];
+      const group = groups[key];
+      let status = "open";
+      if (!group.statuses.some(function (s) { return s === "open"; })) {
+        status = group.statuses.some(function (s) { return s === "done"; }) ? "done" : "unavailable";
+      }
+      const sortAt = status === "open"
+        ? Math.min.apply(null, group.addedAts)
+        : Math.max.apply(null, group.statusAts);
+      return {
+        key: group.key,
+        name: group.name,
+        unitKind: group.unitKind,
+        baseTotal: group.baseTotal,
+        hasAmount: group.hasAmount,
+        itemIds: group.itemIds,
+        status: status,
+        sortAt: sortAt,
+      };
     });
   }
 
@@ -2462,127 +2478,62 @@
     return group.name;
   }
 
-  function sortShoppingGroups(groups) {
+  function sortShoppingGroupsByStatus(groups) {
     return groups.slice().sort(function (a, b) {
-      return a.name.localeCompare(b.name, "de", { sensitivity: "base" });
+      const rankDiff = shoppingStatusSortRank(a.status) - shoppingStatusSortRank(b.status);
+      if (rankDiff !== 0) return rankDiff;
+      return a.sortAt - b.sortAt;
     });
   }
 
-  function getCategorySortIndex(category) {
-    const idx = FOOD_CATEGORY_ORDER.indexOf(category);
-    return idx === -1 ? FOOD_CATEGORY_ORDER.length : idx;
-  }
-
-  function getItemCategory(item) {
-    if (item.foodId) {
-      const food = foods.find(function (f) {
-        return f.id === item.foodId;
-      });
-      if (food) return food.category;
-    }
-    const byName = findFoodByName(item.name);
-    if (byName) return byName.category;
-    return "Sonstiges";
-  }
-
-  function updateShoppingGroupQuantity(group, weekKey, amount, unit) {
-    const value = Number(amount);
-    if (!isFinite(value) || value <= 0) {
-      showToast("Bitte eine gültige Menge eingeben");
-      return false;
-    }
-    if (!group.unitKind || !isValidUnitForKind(group.unitKind, unit)) {
-      showToast("Ungültige Einheit");
-      return false;
-    }
+  function setGroupShoppingStatus(group, weekKey, targetStatus) {
     const items = getWeeklyList(weekKey);
-    const firstItem = items.find(function (item) {
-      return group.itemIds.indexOf(item.id) !== -1;
-    });
-    weeklyShopping[weekKey] = items.filter(function (item) {
-      return group.itemIds.indexOf(item.id) === -1;
-    });
-    getWeeklyList(weekKey).push({
-      id: uid(),
-      name: group.name,
-      foodId: firstItem ? firstItem.foodId : null,
-      amount: value,
-      unit: unit,
-      checked: false,
-      addedAt: Date.now(),
-      source: "manual",
+    const newStatus = group.status === targetStatus ? "open" : targetStatus;
+    const now = Date.now();
+    items.forEach(function (item) {
+      if (group.itemIds.indexOf(item.id) === -1) return;
+      item.status = newStatus;
+      if (newStatus === "open") {
+        item.statusAt = null;
+      } else {
+        item.statusAt = now;
+      }
     });
     persistAll();
-    return true;
+    renderShoppingList();
   }
 
   function appendShoppingGroupRow(list, group, weekKey) {
     const li = document.createElement("li");
-    li.className = "item-row" + (group.checked ? " checked" : "");
-    const checkboxWrap = document.createElement("label");
-    checkboxWrap.className = "checkbox-wrap";
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = group.checked;
-    checkbox.addEventListener("change", function () {
-      const items = getWeeklyList(weekKey);
-      items.forEach(function (item) {
-        if (group.itemIds.indexOf(item.id) !== -1) item.checked = !group.checked;
-      });
-      persistAll();
-      renderShoppingList();
+    li.className = "item-row shopping-item-row status-" + group.status;
+
+    const actions = document.createElement("div");
+    actions.className = "shopping-status-actions";
+
+    const doneBtn = document.createElement("button");
+    doneBtn.type = "button";
+    doneBtn.className = "shopping-status-btn shopping-status-done" + (group.status === "done" ? " active" : "");
+    doneBtn.textContent = "✓";
+    doneBtn.setAttribute("aria-label", group.name + " als erledigt markieren");
+    doneBtn.addEventListener("click", function () {
+      setGroupShoppingStatus(group, weekKey, "done");
     });
-    checkboxWrap.appendChild(checkbox);
 
-    const textWrap = document.createElement("div");
-    textWrap.className = "item-text";
+    const unavailBtn = document.createElement("button");
+    unavailBtn.type = "button";
+    unavailBtn.className = "shopping-status-btn shopping-status-unavailable" + (group.status === "unavailable" ? " active" : "");
+    unavailBtn.textContent = "✕";
+    unavailBtn.setAttribute("aria-label", group.name + " als nicht verfügbar markieren");
+    unavailBtn.addEventListener("click", function () {
+      setGroupShoppingStatus(group, weekKey, "unavailable");
+    });
 
-    if (group.hasAmount && group.unitKind) {
-      const formatted = formatAmountFromBase(group.baseTotal, group.unitKind);
-      const inlineRow = document.createElement("div");
-      inlineRow.className = "shopping-inline-row";
+    actions.appendChild(doneBtn);
+    actions.appendChild(unavailBtn);
 
-      const amountInput = document.createElement("input");
-      amountInput.type = "number";
-      amountInput.className = "shopping-qty-input";
-      amountInput.min = "0.01";
-      amountInput.step = "any";
-      amountInput.inputMode = "decimal";
-      amountInput.value = formatted ? formatted.amount : "";
-      amountInput.setAttribute("aria-label", "Menge für " + group.name);
-
-      const unitSelect = document.createElement("select");
-      unitSelect.className = "shopping-unit-select";
-      unitSelect.setAttribute("aria-label", "Einheit für " + group.name);
-      populateUnitSelect(unitSelect, group.unitKind, formatted ? formatted.unit : getDefaultUnit(group.unitKind));
-
-      const nameEl = document.createElement("span");
-      nameEl.className = "item-name shopping-inline-name";
-      nameEl.textContent = group.name;
-
-      function commitQtyChange() {
-        updateShoppingGroupQuantity(group, weekKey, amountInput.value, unitSelect.value);
-      }
-      amountInput.addEventListener("change", commitQtyChange);
-      unitSelect.addEventListener("change", commitQtyChange);
-
-      inlineRow.appendChild(amountInput);
-      inlineRow.appendChild(unitSelect);
-      inlineRow.appendChild(nameEl);
-      textWrap.appendChild(inlineRow);
-    } else {
-      const name = document.createElement("div");
-      name.className = "item-name";
-      name.textContent = shoppingGroupDisplayName(group);
-      textWrap.appendChild(name);
-    }
-
-    if (group.sources.length > 0) {
-      const meta = document.createElement("div");
-      meta.className = "item-meta";
-      meta.textContent = group.sources.join(" · ");
-      textWrap.appendChild(meta);
-    }
+    const nameEl = document.createElement("div");
+    nameEl.className = "item-name shopping-item-label";
+    nameEl.textContent = shoppingGroupDisplayName(group);
 
     const displayName = shoppingGroupDisplayName(group);
     const removeBtn = document.createElement("button");
@@ -2598,49 +2549,27 @@
       renderShoppingList();
     });
 
-    li.appendChild(checkboxWrap);
-    li.appendChild(textWrap);
+    li.appendChild(actions);
+    li.appendChild(nameEl);
     li.appendChild(removeBtn);
     list.appendChild(li);
   }
 
   function renderShoppingItems(container, emptyEl, items, weekKey) {
     container.innerHTML = "";
-    const groups = aggregateShoppingItems(items);
+    const groups = sortShoppingGroupsByStatus(aggregateShoppingItems(items));
     if (groups.length === 0) {
       emptyEl.classList.remove("hidden");
       return;
     }
     emptyEl.classList.add("hidden");
 
-    const byCategory = {};
+    const list = document.createElement("ul");
+    list.className = "item-list shopping-flat-list";
     groups.forEach(function (group) {
-      const firstItem = items.find(function (item) {
-        return group.itemIds.indexOf(item.id) !== -1;
-      });
-      const category = firstItem ? getItemCategory(firstItem) : "Sonstiges";
-      if (!byCategory[category]) byCategory[category] = [];
-      byCategory[category].push(group);
+      appendShoppingGroupRow(list, group, weekKey);
     });
-
-    const categories = Object.keys(byCategory).sort(function (a, b) {
-      return getCategorySortIndex(a) - getCategorySortIndex(b);
-    });
-
-    categories.forEach(function (category) {
-      const section = document.createElement("section");
-      section.className = "shopping-category-group";
-      const heading = document.createElement("h3");
-      heading.textContent = category;
-      section.appendChild(heading);
-      const list = document.createElement("ul");
-      list.className = "item-list";
-      sortShoppingGroups(byCategory[category]).forEach(function (group) {
-        appendShoppingGroupRow(list, group, weekKey);
-      });
-      section.appendChild(list);
-      container.appendChild(section);
-    });
+    container.appendChild(list);
   }
 
   function renderShoppingList() {
@@ -2850,7 +2779,7 @@
         name: food.name,
         amount: staple.amount,
         unit: staple.unit,
-        checked: false,
+        status: "open",
         addedAt: Date.now(),
         source: "manual",
       });
@@ -3407,7 +3336,7 @@
     document.getElementById("clear-checked").addEventListener("click", function () {
       const weekKey = getShoppingWeekKey();
       weeklyShopping[weekKey] = getWeeklyList(weekKey).filter(function (i) {
-        return i.checked;
+        return normalizeShoppingStatus(i) === "open";
       });
       persistAll();
       renderShoppingList();

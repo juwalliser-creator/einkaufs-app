@@ -187,23 +187,6 @@
         <button type="button" class="btn btn-icon" id="next-week-shopping" aria-label="Nächste Woche">›</button>
         <button type="button" class="btn btn-secondary btn-small" id="shopping-week-today" title="Zur aktuellen Kalenderwoche">Heute</button>
       </div>
-      <div class="card staples-card">
-        <div class="staples-header">
-          <h3 class="section-label staples-title">Wiederkehrende Basics</h3>
-          <button type="button" class="btn btn-primary btn-small" id="add-all-staples">Alle auf Liste</button>
-        </div>
-        <ul id="staples-list" class="staples-list" aria-label="Basics-Liste"></ul>
-        <p id="staples-empty" class="field-hint staples-empty">Noch keine Basics – unten hinzufügen.</p>
-        <form id="add-staple-form" class="staples-add-form">
-          <label for="staple-food-name">Neues Basic</label>
-          <div class="input-row">
-            <input type="text" id="staple-food-name" list="food-name-suggestions" placeholder="Lebensmittel…" autocomplete="off" required>
-            <input type="number" id="staple-amount" min="0.01" step="any" inputmode="decimal" placeholder="Menge" required>
-            <select id="staple-unit" aria-label="Einheit"></select>
-          </div>
-          <button type="submit" class="btn btn-secondary btn-small">Basic speichern</button>
-        </form>
-      </div>
       <form id="quick-add-form" class="card quick-add-form">
         <label for="quick-add-name">Schnell hinzufügen</label>
         <div class="input-row">
@@ -438,6 +421,39 @@
           <button type="button" class="btn btn-secondary" id="cancel-food-edit">Abbrechen</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div id="staples-overlay" class="modal-overlay hidden">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h2 id="staples-modal-title">Wiederkehrende Basics</h2>
+        <button type="button" class="icon-btn modal-close" id="close-staples" aria-label="Schließen">✕</button>
+      </div>
+      <div id="staples-view-panel">
+        <ul id="staples-view-list" class="staples-view-list" aria-label="Basics-Liste"></ul>
+        <p id="staples-view-empty" class="field-hint staples-empty hidden">Noch keine Basics angelegt.</p>
+        <div class="button-row modal-actions">
+          <button type="button" class="btn btn-primary btn-full" id="add-all-staples">Alle auf Einkaufsliste</button>
+          <button type="button" class="btn btn-secondary btn-full" id="open-staples-edit">Bearbeiten</button>
+        </div>
+      </div>
+      <div id="staples-edit-panel" class="hidden">
+        <ul id="staples-list" class="staples-list" aria-label="Basics bearbeiten"></ul>
+        <p id="staples-empty" class="field-hint staples-empty hidden">Noch keine Basics – unten hinzufügen.</p>
+        <form id="add-staple-form" class="staples-add-form">
+          <label for="staple-food-name">Neues Basic</label>
+          <div class="input-row">
+            <input type="text" id="staple-food-name" list="food-name-suggestions" placeholder="Lebensmittel…" autocomplete="off" required>
+            <input type="number" id="staple-amount" min="0.01" step="any" inputmode="decimal" placeholder="Menge" required>
+            <select id="staple-unit" aria-label="Einheit"></select>
+          </div>
+          <button type="submit" class="btn btn-secondary btn-small">Basic speichern</button>
+        </form>
+        <div class="button-row" style="margin-top: 0.75rem;">
+          <button type="button" class="btn btn-primary btn-full" id="close-staples-edit">Fertig</button>
+        </div>
+      </div>
     </div>
   </div>
 

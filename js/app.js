@@ -144,6 +144,14 @@
     stapleAmount: document.getElementById("staple-amount"),
     stapleUnit: document.getElementById("staple-unit"),
     addAllStaplesBtn: document.getElementById("add-all-staples"),
+    staplesOverlay: document.getElementById("staples-overlay"),
+    staplesViewPanel: document.getElementById("staples-view-panel"),
+    staplesEditPanel: document.getElementById("staples-edit-panel"),
+    staplesViewList: document.getElementById("staples-view-list"),
+    staplesViewEmpty: document.getElementById("staples-view-empty"),
+    closeStaples: document.getElementById("close-staples"),
+    openStaplesEdit: document.getElementById("open-staples-edit"),
+    closeStaplesEdit: document.getElementById("close-staples-edit"),
     syncStatus: document.getElementById("sync-status"),
     quickAddForm: document.getElementById("quick-add-form"),
     quickAddName: document.getElementById("quick-add-name"),
@@ -2638,13 +2646,58 @@
   function renderShoppingList() {
     const weekKey = getShoppingWeekKey();
     els.shoppingWeekLabel.textContent = getWeekLabelText();
-    renderStaples();
     renderShoppingItems(
       els.shoppingList,
       els.shoppingEmpty,
       getWeeklyList(weekKey),
       weekKey
     );
+  }
+
+  function renderStaplesViewList() {
+    if (!els.staplesViewList) return;
+    els.staplesViewList.innerHTML = "";
+    if (staples.length === 0) {
+      els.staplesViewEmpty.classList.remove("hidden");
+      return;
+    }
+    els.staplesViewEmpty.classList.add("hidden");
+    staples.forEach(function (staple) {
+      const li = document.createElement("li");
+      li.className = "staple-view-row";
+      const nameEl = document.createElement("span");
+      nameEl.className = "staple-name";
+      nameEl.textContent = staple.name;
+      const qtyEl = document.createElement("span");
+      qtyEl.className = "staple-view-qty";
+      qtyEl.textContent = formatQuantity(staple.amount, staple.unit);
+      li.appendChild(nameEl);
+      li.appendChild(qtyEl);
+      els.staplesViewList.appendChild(li);
+    });
+  }
+
+  function showStaplesViewMode() {
+    els.staplesViewPanel.classList.remove("hidden");
+    els.staplesEditPanel.classList.add("hidden");
+    renderStaplesViewList();
+  }
+
+  function showStaplesEditMode() {
+    els.staplesViewPanel.classList.add("hidden");
+    els.staplesEditPanel.classList.remove("hidden");
+    renderStaples();
+  }
+
+  function openStaplesModal() {
+    showStaplesViewMode();
+    els.staplesOverlay.classList.remove("hidden");
+  }
+
+  function closeStaplesModal() {
+    els.staplesOverlay.classList.add("hidden");
+    showStaplesViewMode();
+    if (activeView === "foods") renderFoods();
   }
 
   function syncStapleUnitSelectFromFoodName() {
@@ -2716,6 +2769,7 @@
         staples = staples.filter(function (s) { return s.id !== staple.id; });
         persistAll();
         renderStaples();
+        renderStaplesViewList();
       });
 
       li.appendChild(nameEl);
@@ -2773,6 +2827,7 @@
     els.stapleAmount.value = "";
     syncStapleUnitSelectFromFoodName();
     renderStaples();
+    renderStaplesViewList();
     showToast('"' + food.name + '" als Basic gespeichert');
   }
 
@@ -2821,10 +2876,39 @@
       grouped[food.category].push(food);
     });
     els.foodGroups.innerHTML = "";
+
+    const pinSection = document.createElement("section");
+    pinSection.className = "food-group food-group-pinned";
+    const pinRow = document.createElement("button");
+    pinRow.type = "button";
+    pinRow.className = "food-row food-row-pinned";
+    pinRow.setAttribute("aria-label", "Wiederkehrende Basics anzeigen");
+    const pinInfo = document.createElement("div");
+    pinInfo.style.flex = "1";
+    const pinName = document.createElement("div");
+    pinName.className = "item-name";
+    pinName.textContent = "Wiederkehrende Basics";
+    const pinMeta = document.createElement("div");
+    pinMeta.className = "item-meta";
+    pinMeta.textContent = staples.length
+      ? staples.length + (staples.length === 1 ? " Eintrag" : " Einträge")
+      : "Noch leer – tippen zum Anlegen";
+    pinInfo.appendChild(pinName);
+    pinInfo.appendChild(pinMeta);
+    const pinChevron = document.createElement("span");
+    pinChevron.className = "food-row-chevron";
+    pinChevron.setAttribute("aria-hidden", "true");
+    pinChevron.textContent = "›";
+    pinRow.appendChild(pinInfo);
+    pinRow.appendChild(pinChevron);
+    pinRow.addEventListener("click", openStaplesModal);
+    pinSection.appendChild(pinRow);
+    els.foodGroups.appendChild(pinSection);
+
     const categories = Object.keys(grouped).sort(function (a, b) {
       return a.localeCompare(b, "de");
     });
-    if (categories.length === 0) {
+    if (categories.length === 0 && staples.length === 0) {
       els.foodsEmpty.classList.remove("hidden");
       return;
     }
@@ -3356,6 +3440,23 @@
     }
     if (els.addAllStaplesBtn) {
       els.addAllStaplesBtn.addEventListener("click", addAllStaplesToList);
+    }
+    if (els.closeStaples) {
+      els.closeStaples.addEventListener("click", closeStaplesModal);
+    }
+    if (els.staplesOverlay) {
+      els.staplesOverlay.addEventListener("click", function (e) {
+        if (e.target === els.staplesOverlay) closeStaplesModal();
+      });
+    }
+    if (els.openStaplesEdit) {
+      els.openStaplesEdit.addEventListener("click", showStaplesEditMode);
+    }
+    if (els.closeStaplesEdit) {
+      els.closeStaplesEdit.addEventListener("click", function () {
+        showStaplesViewMode();
+        renderFoods();
+      });
     }
 
     window.addEventListener("online", function () {

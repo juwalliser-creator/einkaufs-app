@@ -190,14 +190,16 @@
         <input type="text" id="work-person-name" placeholder="z.B. Max" autocomplete="name" maxlength="32">
         <p class="field-hint">Wird auf diesem Gerät gespeichert. Trage nur deine eigenen Schichten ein.</p>
       </div>
-      <div class="week-nav">
-        <button type="button" class="btn btn-icon" id="prev-week-work" aria-label="Vorherige Woche">‹</button>
-        <span id="work-week-label">Diese Woche</span>
-        <button type="button" class="btn btn-icon" id="next-week-work" aria-label="Nächste Woche">›</button>
-        <button type="button" class="btn btn-secondary btn-small" id="work-week-today" title="Zur aktuellen Woche">Heute</button>
+      <p class="field-hint work-fiete-hint">Fiete sollte nicht länger als 6 Stunden allein sein. Grün = ok, Rot = kritisch.</p>
+      <div class="calendar-nav week-nav">
+        <button type="button" class="btn btn-icon" id="prev-month-work" aria-label="Vorheriger Monat">‹</button>
+        <span id="work-month-label">Monat</span>
+        <button type="button" class="btn btn-icon" id="next-month-work" aria-label="Nächster Monat">›</button>
       </div>
-      <p class="field-hint work-fiete-hint">Fiete sollte nicht länger als 6 Stunden allein sein (niemand zuhause).</p>
-      <div id="work-week-days" class="work-week-days" aria-label="Wochenübersicht Arbeitsplan"></div>
+      <div class="calendar-weekdays" aria-hidden="true">
+        <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+      </div>
+      <div id="work-calendar-grid" class="calendar-grid" role="grid" aria-label="Arbeitsplan Monatskalender"></div>
     </section>
 
     <!-- Einkaufsliste -->
@@ -559,6 +561,23 @@
           <button type="submit" class="btn btn-primary">Erledigt speichern</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div id="work-day-detail-overlay" class="modal-overlay hidden">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h2 id="work-day-detail-title">Tag</h2>
+        <button type="button" class="icon-btn modal-close" id="close-work-day-detail" aria-label="Schließen">✕</button>
+      </div>
+      <p id="work-day-detail-fiete" class="work-fiete-status"></p>
+      <div class="day-detail-section">
+        <h3 class="section-label">Schichten</h3>
+        <ul id="work-day-detail-shifts" class="work-shift-list"></ul>
+      </div>
+      <div class="button-row modal-actions">
+        <button type="button" class="btn btn-primary btn-full" id="work-day-add-shift">+ Schicht</button>
+      </div>
     </div>
   </div>
 

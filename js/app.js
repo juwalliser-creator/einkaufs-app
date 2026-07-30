@@ -4,7 +4,6 @@
   const ROOM_STORAGE_KEY = "einkaufsapp_room";
   const PERSON_STORAGE_KEY = "einkaufsapp_person";
   const SHOPPING_WEEK_OFFSET_KEY = "einkaufsapp_shopping_week_offset";
-  const WORK_WEEK_OFFSET_KEY = "einkaufsapp_work_week_offset";
   const FIETE_MAX_ALONE_MINUTES = 360;
   const DOG_NAME = "Fiete";
   const OFFLINE_CACHE_KEY = "einkaufsapp_offline_cache";
@@ -74,9 +73,10 @@
   let workShifts = {};
   let staples = [];
   let shoppingWeekOffset = 0;
-  let workWeekOffset = 0;
+  let workMonthOffset = 0;
   let isOfflineMode = false;
   let workShiftModalContext = null;
+  let workDayDetailDateKey = null;
 
   let dishFilter = { diet: null, temp: null };
 
@@ -109,8 +109,14 @@
     sportOthers: document.getElementById("sport-others"),
     sportWeekSummary: document.getElementById("sport-week-summary"),
     workPersonName: document.getElementById("work-person-name"),
-    workWeekLabel: document.getElementById("work-week-label"),
-    workWeekDays: document.getElementById("work-week-days"),
+    workMonthLabel: document.getElementById("work-month-label"),
+    workCalendarGrid: document.getElementById("work-calendar-grid"),
+    workDayDetailOverlay: document.getElementById("work-day-detail-overlay"),
+    workDayDetailTitle: document.getElementById("work-day-detail-title"),
+    workDayDetailFiete: document.getElementById("work-day-detail-fiete"),
+    workDayDetailShifts: document.getElementById("work-day-detail-shifts"),
+    closeWorkDayDetail: document.getElementById("close-work-day-detail"),
+    workDayAddShift: document.getElementById("work-day-add-shift"),
     workShiftOverlay: document.getElementById("work-shift-overlay"),
     workShiftTitle: document.getElementById("work-shift-title"),
     workShiftDateLabel: document.getElementById("work-shift-date-label"),
@@ -444,24 +450,6 @@
   function saveShoppingWeekOffset(offset) {
     try {
       localStorage.setItem(SHOPPING_WEEK_OFFSET_KEY, String(offset));
-    } catch (err) {
-      /* ignore */
-    }
-  }
-
-  function loadWorkWeekOffset() {
-    try {
-      const value = localStorage.getItem(WORK_WEEK_OFFSET_KEY);
-      const parsed = parseInt(value, 10);
-      return isFinite(parsed) ? parsed : 0;
-    } catch (err) {
-      return 0;
-    }
-  }
-
-  function saveWorkWeekOffset(offset) {
-    try {
-      localStorage.setItem(WORK_WEEK_OFFSET_KEY, String(offset));
     } catch (err) {
       /* ignore */
     }
@@ -1235,31 +1223,69 @@
     return text;
   }
 
-  function getWorkWeekLabelText() {
-    const weekStart = getWeekStart(workWeekOffset);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-    if (workWeekOffset === 0) return "Diese Woche";
-    if (workWeekOffset === 1) return "Nächste Woche";
-    if (workWeekOffset === -1) return "Letzte Woche";
-    return formatDate(weekStart) + " – " + formatDate(weekEnd);
-  }
-
-  function changeWorkWeekOffset(delta) {
-    workWeekOffset += delta;
-    saveWorkWeekOffset(workWeekOffset);
-    renderActiveView();
-  }
-
-  function resetWorkWeekOffset() {
-    workWeekOffset = 0;
-    saveWorkWeekOffset(0);
+  function changeWorkMonthOffset(delta) {
+    workMonthOffset += delta;
     renderActiveView();
   }
 
   function isCurrentWorkPerson(personName) {
     const mine = getPersonName();
     return mine && normalizeName(personName) === mine;
+  }
+
+  function renderWorkShiftList(container, dateKey) {
+    if (!container) return;
+    container.innerHTML = "";
+    const shifts = getWorkShiftsForDay(dateKey);
+    if (!shifts.length) {
+      const empty = document.createElement("li");
+      empty.className = "work-shift-empty";
+      empty.textContent = "Keine Schichten";
+      container.appendChild(empty);
+      return;
+    }
+    shifts.forEach(function (shift) {
+      const li = document.createElement("li");
+      li.className = "work-shift-row";
+      const label = document.createElement("span");
+      label.className = "work-shift-label";
+      label.textContent = shift.personName + ": " + shift.start + " – " + shift.end;
+      li.appendChild(label);
+      if (isCurrentWorkPerson(shift.personName)) {
+        const editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.className = "icon-btn";
+        editBtn.textContent = "✎";
+        editBtn.setAttribute("aria-label", "Schicht bearbeiten");
+        editBtn.addEventListener("click", function () {
+          openWorkShiftModal(dateKey, shift.id);
+        });
+        li.appendChild(editBtn);
+      }
+      container.appendChild(li);
+    });
+  }
+
+  function openWorkDayDetailModal(dateKey) {
+    workDayDetailDateKey = dateKey;
+    const date = parseDateKey(dateKey);
+    const analysis = analyzeFieteAlone(dateKey);
+    els.workDayDetailTitle.textContent = formatLongDate(date);
+    els.workDayDetailFiete.className = "work-fiete-status" + (analysis.critical ? " work-fiete-critical" : "");
+    els.workDayDetailFiete.textContent = getFieteStatusText(analysis);
+    renderWorkShiftList(els.workDayDetailShifts, dateKey);
+    els.workDayDetailOverlay.classList.remove("hidden");
+  }
+
+  function closeWorkDayDetailModal() {
+    workDayDetailDateKey = null;
+    els.workDayDetailOverlay.classList.add("hidden");
+  }
+
+  function refreshWorkDayDetailIfOpen() {
+    if (workDayDetailDateKey && !els.workDayDetailOverlay.classList.contains("hidden")) {
+      openWorkDayDetailModal(workDayDetailDateKey);
+    }
   }
 
   function saveWorkShift(dateKey, shiftData) {
@@ -1347,6 +1373,7 @@
     if (saveWorkShift(workShiftModalContext.dateKey, shiftData)) {
       closeWorkShiftModal();
       renderActiveView();
+      refreshWorkDayDetailIfOpen();
       showToast("Schicht gespeichert");
     }
   }
@@ -1356,6 +1383,7 @@
     deleteWorkShift(workShiftModalContext.dateKey, workShiftModalContext.shiftId);
     closeWorkShiftModal();
     renderActiveView();
+    refreshWorkDayDetailIfOpen();
     showToast("Schicht gelöscht");
   }
 
@@ -1363,75 +1391,59 @@
     if (els.workPersonName) {
       els.workPersonName.value = getPersonName();
     }
-    els.workWeekLabel.textContent = getWorkWeekLabelText();
-    els.workWeekDays.innerHTML = "";
-    const weekStart = getWeekStart(workWeekOffset);
-    const dayNames = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+    const monthStart = getCalendarMonthStart(workMonthOffset);
+    const year = monthStart.getFullYear();
+    const month = monthStart.getMonth();
+    els.workMonthLabel.textContent = monthStart.toLocaleDateString("de-DE", {
+      month: "long",
+      year: "numeric",
+    });
 
-    for (let i = 0; i < 7; i += 1) {
-      const dayDate = new Date(weekStart);
-      dayDate.setDate(weekStart.getDate() + i);
-      const dateKey = dateKeyFromDate(dayDate);
-      const shifts = getWorkShiftsForDay(dateKey);
-      const analysis = analyzeFieteAlone(dateKey);
+    const firstOfMonth = new Date(year, month, 1);
+    let padStart = firstOfMonth.getDay();
+    padStart = padStart === 0 ? 6 : padStart - 1;
 
-      const card = document.createElement("article");
-      card.className = "card work-day-card" + (analysis.critical ? " work-day-critical" : "");
+    const gridStart = new Date(firstOfMonth);
+    gridStart.setDate(gridStart.getDate() - padStart);
 
-      const header = document.createElement("div");
-      header.className = "work-day-header";
-      const title = document.createElement("h3");
-      title.className = "work-day-title";
-      title.textContent = dayNames[i] + ", " + formatDate(dayDate);
-      header.appendChild(title);
+    const todayKey = dateKeyFromDate(new Date());
+    els.workCalendarGrid.innerHTML = "";
 
-      const addBtn = document.createElement("button");
-      addBtn.type = "button";
-      addBtn.className = "btn btn-secondary btn-small";
-      addBtn.textContent = "+ Schicht";
-      addBtn.addEventListener("click", function () {
-        openWorkShiftModal(dateKey, null);
-      });
-      header.appendChild(addBtn);
-      card.appendChild(header);
+    for (let i = 0; i < 42; i += 1) {
+      const cellDate = new Date(gridStart);
+      cellDate.setDate(gridStart.getDate() + i);
+      const key = dateKeyFromDate(cellDate);
+      const inMonth = cellDate.getMonth() === month;
+      const analysis = analyzeFieteAlone(key);
 
-      const shiftList = document.createElement("ul");
-      shiftList.className = "work-shift-list";
-      if (!shifts.length) {
-        const empty = document.createElement("li");
-        empty.className = "work-shift-empty";
-        empty.textContent = "Keine Schichten";
-        shiftList.appendChild(empty);
-      } else {
-        shifts.forEach(function (shift) {
-          const li = document.createElement("li");
-          li.className = "work-shift-row";
-          const label = document.createElement("span");
-          label.className = "work-shift-label";
-          label.textContent = shift.personName + ": " + shift.start + " – " + shift.end;
-          li.appendChild(label);
-          if (isCurrentWorkPerson(shift.personName)) {
-            const editBtn = document.createElement("button");
-            editBtn.type = "button";
-            editBtn.className = "icon-btn";
-            editBtn.textContent = "✎";
-            editBtn.setAttribute("aria-label", "Schicht bearbeiten");
-            editBtn.addEventListener("click", function () {
-              openWorkShiftModal(dateKey, shift.id);
-            });
-            li.appendChild(editBtn);
-          }
-          shiftList.appendChild(li);
-        });
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "calendar-cell";
+      btn.setAttribute("role", "gridcell");
+      if (!inMonth) btn.classList.add("outside-month");
+      if (key === todayKey) btn.classList.add("is-today");
+      if (inMonth) {
+        if (analysis.critical) btn.classList.add("calendar-cell-fiete-critical");
+        else btn.classList.add("calendar-cell-fiete-ok");
       }
-      card.appendChild(shiftList);
 
-      const fiete = document.createElement("p");
-      fiete.className = "work-fiete-status" + (analysis.critical ? " work-fiete-critical" : "");
-      fiete.textContent = getFieteStatusText(analysis);
-      card.appendChild(fiete);
+      const dayNum = document.createElement("span");
+      dayNum.className = "calendar-day-num";
+      dayNum.textContent = String(cellDate.getDate());
+      btn.appendChild(dayNum);
 
-      els.workWeekDays.appendChild(card);
+      const shifts = getWorkShiftsForDay(key);
+      if (inMonth && shifts.length > 0) {
+        const hint = document.createElement("span");
+        hint.className = "calendar-work-hint";
+        hint.textContent = shifts.length + (shifts.length === 1 ? " Schicht" : " Schichten");
+        btn.appendChild(hint);
+      }
+
+      btn.addEventListener("click", function () {
+        openWorkDayDetailModal(key);
+      });
+      els.workCalendarGrid.appendChild(btn);
     }
   }
 
@@ -3748,17 +3760,29 @@
     });
     document.getElementById("shopping-week-today").addEventListener("click", resetShoppingWeekOffset);
 
-    document.getElementById("prev-week-work").addEventListener("click", function () {
-      changeWorkWeekOffset(-1);
+    document.getElementById("prev-month-work").addEventListener("click", function () {
+      changeWorkMonthOffset(-1);
     });
-    document.getElementById("next-week-work").addEventListener("click", function () {
-      changeWorkWeekOffset(1);
+    document.getElementById("next-month-work").addEventListener("click", function () {
+      changeWorkMonthOffset(1);
     });
-    document.getElementById("work-week-today").addEventListener("click", resetWorkWeekOffset);
     if (els.workPersonName) {
       els.workPersonName.addEventListener("change", function () {
         savePersonName(els.workPersonName.value);
         renderActiveView();
+      });
+    }
+    if (els.closeWorkDayDetail) {
+      els.closeWorkDayDetail.addEventListener("click", closeWorkDayDetailModal);
+    }
+    if (els.workDayDetailOverlay) {
+      els.workDayDetailOverlay.addEventListener("click", function (e) {
+        if (e.target === els.workDayDetailOverlay) closeWorkDayDetailModal();
+      });
+    }
+    if (els.workDayAddShift) {
+      els.workDayAddShift.addEventListener("click", function () {
+        if (workDayDetailDateKey) openWorkShiftModal(workDayDetailDateKey, null);
       });
     }
     if (els.workShiftForm) {
@@ -3933,7 +3957,6 @@
 
   function startApp() {
     shoppingWeekOffset = loadShoppingWeekOffset();
-    workWeekOffset = loadWorkWeekOffset();
     window.showAppToast = showToast;
     bindEvents();
     if (els.stapleUnit) {

@@ -185,10 +185,14 @@
 
     <!-- Arbeitsplan -->
     <section id="view-work" class="view">
-      <div class="card work-person-card">
-        <label for="work-person-name">Dein Name</label>
-        <input type="text" id="work-person-name" placeholder="z.B. Max" autocomplete="name" maxlength="32">
-        <p class="field-hint">Wird auf diesem Gerät gespeichert. Trage nur deine eigenen Schichten ein.</p>
+      <div class="card work-templates-card">
+        <div class="work-templates-header">
+          <h3 class="section-label work-templates-title">Meine Dienst-Vorlagen</h3>
+          <button type="button" class="btn btn-secondary btn-small" id="open-add-work-template">+ Vorlage</button>
+        </div>
+        <p class="field-hint">Nur in deinem Account sichtbar (z.&nbsp;B. F1, F2). Beim Planen wählst du einen Dienst für den Tag.</p>
+        <ul id="work-templates-list" class="work-templates-list" aria-label="Dienst-Vorlagen"></ul>
+        <p id="work-templates-empty" class="field-hint work-templates-empty">Noch keine Vorlagen – lege z.&nbsp;B. F1 und F2 an.</p>
       </div>
       <p class="field-hint work-fiete-hint">Fiete sollte nicht länger als 6 Stunden allein sein. Grün = ok, Rot = kritisch.</p>
       <div class="calendar-nav week-nav">
@@ -581,6 +585,27 @@
     </div>
   </div>
 
+  <div id="work-template-overlay" class="modal-overlay hidden">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h2 id="work-template-title">Dienst-Vorlage</h2>
+        <button type="button" class="icon-btn modal-close" id="close-work-template" aria-label="Schließen">✕</button>
+      </div>
+      <form id="work-template-form">
+        <label for="work-template-code">Kürzel</label>
+        <input type="text" id="work-template-code" placeholder="z.B. F1" autocomplete="off" maxlength="12" required>
+        <label for="work-template-start" class="field-label" style="margin-top: 0.75rem;">Von</label>
+        <input type="time" id="work-template-start" required>
+        <label for="work-template-end" class="field-label" style="margin-top: 0.75rem;">Bis</label>
+        <input type="time" id="work-template-end" required>
+        <div class="button-row" style="margin-top: 0.75rem;">
+          <button type="submit" class="btn btn-primary">Speichern</button>
+          <button type="button" class="btn btn-danger-outline hidden" id="delete-work-template">Löschen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="work-shift-overlay" class="modal-overlay hidden">
     <div class="modal-card card">
       <div class="modal-header">
@@ -588,13 +613,20 @@
         <button type="button" class="icon-btn modal-close" id="close-work-shift" aria-label="Schließen">✕</button>
       </div>
       <p id="work-shift-date-label" class="modal-hint"></p>
-      <form id="work-shift-form">
+      <div id="work-shift-pick-panel">
+        <p class="modal-hint">Wähle einen deiner Dienste:</p>
+        <div id="work-shift-template-buttons" class="work-template-pick-grid"></div>
+        <p id="work-shift-no-templates" class="field-hint hidden">Noch keine Vorlagen – lege sie oben unter „Meine Dienst-Vorlagen“ an.</p>
+        <button type="button" class="btn btn-secondary btn-full" id="work-shift-custom-btn" style="margin-top: 0.75rem;">Sonder-Schicht (Zeiten manuell)</button>
+      </div>
+      <form id="work-shift-form" class="hidden">
         <label for="work-shift-start">Von</label>
         <input type="time" id="work-shift-start" required>
         <label for="work-shift-end" class="field-label" style="margin-top: 0.75rem;">Bis</label>
         <input type="time" id="work-shift-end" required>
         <div class="button-row" style="margin-top: 0.75rem;">
           <button type="submit" class="btn btn-primary">Speichern</button>
+          <button type="button" class="btn btn-secondary" id="work-shift-back-pick">Zurück</button>
           <button type="button" class="btn btn-danger-outline hidden" id="delete-work-shift">Löschen</button>
         </div>
       </form>

@@ -71,12 +71,16 @@
   let mealPlan = {};
   let sportLog = {};
   let workShifts = {};
+  let shiftTemplates = [];
+  let userProfile = null;
+  let unsubscribeUserProfile = null;
   let staples = [];
   let shoppingWeekOffset = 0;
   let workMonthOffset = 0;
   let isOfflineMode = false;
   let workShiftModalContext = null;
   let workDayDetailDateKey = null;
+  let workTemplateModalContext = null;
 
   let dishFilter = { diet: null, temp: null };
 
@@ -108,7 +112,17 @@
     closeSportDone: document.getElementById("close-sport-done"),
     sportOthers: document.getElementById("sport-others"),
     sportWeekSummary: document.getElementById("sport-week-summary"),
-    workPersonName: document.getElementById("work-person-name"),
+    workTemplatesList: document.getElementById("work-templates-list"),
+    workTemplatesEmpty: document.getElementById("work-templates-empty"),
+    openAddWorkTemplate: document.getElementById("open-add-work-template"),
+    workTemplateOverlay: document.getElementById("work-template-overlay"),
+    workTemplateTitle: document.getElementById("work-template-title"),
+    workTemplateForm: document.getElementById("work-template-form"),
+    workTemplateCode: document.getElementById("work-template-code"),
+    workTemplateStart: document.getElementById("work-template-start"),
+    workTemplateEnd: document.getElementById("work-template-end"),
+    closeWorkTemplate: document.getElementById("close-work-template"),
+    deleteWorkTemplate: document.getElementById("delete-work-template"),
     workMonthLabel: document.getElementById("work-month-label"),
     workCalendarGrid: document.getElementById("work-calendar-grid"),
     workDayDetailOverlay: document.getElementById("work-day-detail-overlay"),
@@ -118,6 +132,11 @@
     closeWorkDayDetail: document.getElementById("close-work-day-detail"),
     workDayAddShift: document.getElementById("work-day-add-shift"),
     workShiftOverlay: document.getElementById("work-shift-overlay"),
+    workShiftPickPanel: document.getElementById("work-shift-pick-panel"),
+    workShiftTemplateButtons: document.getElementById("work-shift-template-buttons"),
+    workShiftNoTemplates: document.getElementById("work-shift-no-templates"),
+    workShiftCustomBtn: document.getElementById("work-shift-custom-btn"),
+    workShiftBackPick: document.getElementById("work-shift-back-pick"),
     workShiftTitle: document.getElementById("work-shift-title"),
     workShiftDateLabel: document.getElementById("work-shift-date-label"),
     workShiftForm: document.getElementById("work-shift-form"),
@@ -778,6 +797,7 @@
       unsubscribeRoom();
       unsubscribeRoom = null;
     }
+    disconnectUserProfile();
     roomRef = null;
     isInitialized = false;
     hideSetupOverlay();
@@ -785,6 +805,7 @@
   }
 
   function enterAppAfterAuth() {
+    subscribeUserProfile();
     switchView("home");
     if (roomRef && isInitialized) return;
     const urlRoom = getRoomFromUrl();
@@ -1090,10 +1111,224 @@
     if (parseTimeToMinutes(end) <= parseTimeToMinutes(start)) return null;
     return {
       id: shift.id || uid(),
+      ownerUid: shift.ownerUid || null,
       personName: personName,
+      templateCode: shift.templateCode ? normalizeTemplateCode(shift.templateCode) : null,
       start: start,
       end: end,
     };
+  }
+
+  function migrateShiftTemplate(template) {
+    if (!template || typeof template !== "object") return null;
+    const code = normalizeTemplateCode(template.code || "");
+    const start = template.start || "";
+    const end = template.end || "";
+    if (!code || !/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) return null;
+    if (parseTimeToMinutes(end) <= parseTimeToMinutes(start)) return null;
+    return {
+      id: template.id || uid(),
+      code: code,
+      start: start,
+      end: end,
+    };
+  }
+
+  function normalizeTemplateCode(code) {
+    return (code || "").trim().toUpperCase().replace(/\s+/g, "");
+  }
+
+  function getWorkDisplayName() {
+    if (userProfile && userProfile.username) {
+      return normalizeName(userProfile.username);
+    }
+    const user = window.WGAuth && WGAuth.getCurrentUser();
+    if (user && user.displayName) {
+      return normalizeName(user.displayName);
+    }
+    return getPersonName();
+  }
+
+  function getShiftPersonKey(shift) {
+    return shift.ownerUid || shift.personName;
+  }
+
+  function isOwnWorkShift(shift) {
+    const user = window.WGAuth && WGAuth.getCurrentUser();
+    if (user && shift.ownerUid) return shift.ownerUid === user.uid;
+    const mine = getWorkDisplayName() || getPersonName();
+    return mine && normalizeName(shift.personName) === mine;
+  }
+
+  function formatWorkShiftLabel(shift) {
+    const codePart = shift.templateCode ? shift.templateCode + " · " : "";
+    return shift.personName + ": " + codePart + shift.start + " – " + shift.end;
+  }
+
+  function disconnectUserProfile() {
+    if (unsubscribeUserProfile) {
+      unsubscribeUserProfile();
+      unsubscribeUserProfile = null;
+    }
+    userProfile = null;
+    shiftTemplates = [];
+  }
+
+  function subscribeUserProfile() {
+    disconnectUserProfile();
+    if (!db || !window.WGAuth || !WGAuth.isVerified()) return;
+    const user = WGAuth.getCurrentUser();
+    if (!user) return;
+    unsubscribeUserProfile = db.collection("users").doc(user.uid).onSnapshot(
+      function (snapshot) {
+        if (snapshot.exists) {
+          userProfile = snapshot.data();
+          shiftTemplates = (userProfile.shiftTemplates || [])
+            .map(migrateShiftTemplate)
+            .filter(Boolean);
+          shiftTemplates.sort(function (a, b) {
+            return a.code.localeCompare(b.code, "de");
+          });
+          if (userProfile.username) {
+            savePersonName(userProfile.username);
+          }
+        } else {
+          userProfile = null;
+          shiftTemplates = [];
+        }
+        if (activeView === "work") renderWorkView();
+      },
+      function () {
+        showToast("Profil konnte nicht geladen werden");
+      }
+    );
+  }
+
+  function persistShiftTemplates() {
+    if (!db || !window.WGAuth || !WGAuth.isVerified()) {
+      showToast("Bitte angemeldet sein");
+      return false;
+    }
+    const user = WGAuth.getCurrentUser();
+    if (!user) return false;
+    return db.collection("users").doc(user.uid).set({
+      shiftTemplates: shiftTemplates,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true }).then(function () {
+      return true;
+    }).catch(function () {
+      showToast("Vorlagen konnten nicht gespeichert werden");
+      return false;
+    });
+  }
+
+  function renderWorkTemplatesList() {
+    if (!els.workTemplatesList) return;
+    els.workTemplatesList.innerHTML = "";
+    if (!shiftTemplates.length) {
+      if (els.workTemplatesEmpty) els.workTemplatesEmpty.classList.remove("hidden");
+      return;
+    }
+    if (els.workTemplatesEmpty) els.workTemplatesEmpty.classList.add("hidden");
+    shiftTemplates.forEach(function (template) {
+      const li = document.createElement("li");
+      li.className = "work-template-row";
+      const label = document.createElement("span");
+      label.className = "work-template-label";
+      label.textContent = template.code + " · " + template.start + " – " + template.end;
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "icon-btn";
+      editBtn.textContent = "✎";
+      editBtn.setAttribute("aria-label", template.code + " bearbeiten");
+      editBtn.addEventListener("click", function () {
+        openWorkTemplateModal(template.id);
+      });
+      li.appendChild(label);
+      li.appendChild(editBtn);
+      els.workTemplatesList.appendChild(li);
+    });
+  }
+
+  function openWorkTemplateModal(templateId) {
+    workTemplateModalContext = { templateId: templateId || null };
+    if (templateId) {
+      const template = shiftTemplates.find(function (t) { return t.id === templateId; });
+      if (!template) return;
+      els.workTemplateTitle.textContent = "Vorlage bearbeiten";
+      els.workTemplateCode.value = template.code;
+      els.workTemplateStart.value = template.start;
+      els.workTemplateEnd.value = template.end;
+      els.deleteWorkTemplate.classList.remove("hidden");
+    } else {
+      els.workTemplateTitle.textContent = "Neue Vorlage";
+      els.workTemplateCode.value = "";
+      els.workTemplateStart.value = "06:30";
+      els.workTemplateEnd.value = "14:30";
+      els.deleteWorkTemplate.classList.add("hidden");
+    }
+    els.workTemplateOverlay.classList.remove("hidden");
+  }
+
+  function closeWorkTemplateModal() {
+    workTemplateModalContext = null;
+    els.workTemplateOverlay.classList.add("hidden");
+    els.workTemplateForm.reset();
+    els.deleteWorkTemplate.classList.add("hidden");
+  }
+
+  function handleWorkTemplateSubmit(event) {
+    event.preventDefault();
+    const code = normalizeTemplateCode(els.workTemplateCode.value);
+    const start = els.workTemplateStart.value;
+    const end = els.workTemplateEnd.value;
+    const migrated = migrateShiftTemplate({ code: code, start: start, end: end });
+    if (!migrated) {
+      showToast("Bitte Kürzel und gültige Zeiten eingeben");
+      return;
+    }
+    const duplicate = shiftTemplates.find(function (t) {
+      if (workTemplateModalContext && workTemplateModalContext.templateId === t.id) return false;
+      return t.code === migrated.code;
+    });
+    if (duplicate) {
+      showToast('Kürzel "' + migrated.code + '" existiert bereits');
+      return;
+    }
+    if (workTemplateModalContext && workTemplateModalContext.templateId) {
+      const idx = shiftTemplates.findIndex(function (t) {
+        return t.id === workTemplateModalContext.templateId;
+      });
+      if (idx !== -1) {
+        migrated.id = shiftTemplates[idx].id;
+        shiftTemplates[idx] = migrated;
+      }
+    } else {
+      migrated.id = uid();
+      shiftTemplates.push(migrated);
+    }
+    shiftTemplates.sort(function (a, b) {
+      return a.code.localeCompare(b.code, "de");
+    });
+    persistShiftTemplates().then(function (ok) {
+      if (!ok) return;
+      closeWorkTemplateModal();
+      renderWorkTemplatesList();
+      showToast('Vorlage "' + migrated.code + '" gespeichert');
+    });
+  }
+
+  function handleDeleteWorkTemplate() {
+    if (!workTemplateModalContext || !workTemplateModalContext.templateId) return;
+    shiftTemplates = shiftTemplates.filter(function (t) {
+      return t.id !== workTemplateModalContext.templateId;
+    });
+    persistShiftTemplates().then(function (ok) {
+      if (!ok) return;
+      closeWorkTemplateModal();
+      renderWorkTemplatesList();
+      showToast("Vorlage gelöscht");
+    });
   }
 
   function parseTimeToMinutes(timeStr) {
@@ -1152,23 +1387,24 @@
     }
     const persons = [];
     shifts.forEach(function (shift) {
-      if (persons.indexOf(shift.personName) === -1) persons.push(shift.personName);
+      const key = getShiftPersonKey(shift);
+      if (persons.indexOf(key) === -1) persons.push(key);
     });
     if (persons.length < 2) {
       return { maxAloneMinutes: 0, critical: false, worstInterval: null };
     }
 
     const awayByPerson = {};
-    persons.forEach(function (personName) {
+    persons.forEach(function (personKey) {
       const intervals = shifts
-        .filter(function (shift) { return shift.personName === personName; })
+        .filter(function (shift) { return getShiftPersonKey(shift) === personKey; })
         .map(function (shift) {
           return {
             start: parseTimeToMinutes(shift.start),
             end: parseTimeToMinutes(shift.end),
           };
         });
-      awayByPerson[personName] = mergeTimeIntervals(intervals);
+      awayByPerson[personKey] = mergeTimeIntervals(intervals);
     });
 
     let maxAlone = 0;
@@ -1177,8 +1413,8 @@
     let currentStart = null;
 
     for (let minute = 0; minute < 1440; minute += 1) {
-      const allAway = persons.every(function (personName) {
-        return isMinuteInIntervals(minute, awayByPerson[personName]);
+      const allAway = persons.every(function (personKey) {
+        return isMinuteInIntervals(minute, awayByPerson[personKey]);
       });
       if (allAway) {
         if (currentStart === null) currentStart = minute;
@@ -1229,7 +1465,7 @@
   }
 
   function isCurrentWorkPerson(personName) {
-    const mine = getPersonName();
+    const mine = getWorkDisplayName() || getPersonName();
     return mine && normalizeName(personName) === mine;
   }
 
@@ -1249,9 +1485,9 @@
       li.className = "work-shift-row";
       const label = document.createElement("span");
       label.className = "work-shift-label";
-      label.textContent = shift.personName + ": " + shift.start + " – " + shift.end;
+      label.textContent = formatWorkShiftLabel(shift);
       li.appendChild(label);
-      if (isCurrentWorkPerson(shift.personName)) {
+      if (isOwnWorkShift(shift)) {
         const editBtn = document.createElement("button");
         editBtn.type = "button";
         editBtn.className = "icon-btn";
@@ -1320,11 +1556,80 @@
     persistAll();
   }
 
+  function buildWorkShiftPayload(base) {
+    const user = window.WGAuth && WGAuth.getCurrentUser();
+    return {
+      id: base.id || uid(),
+      ownerUid: user ? user.uid : null,
+      personName: getWorkDisplayName() || getPersonName(),
+      templateCode: base.templateCode || null,
+      start: base.start,
+      end: base.end,
+    };
+  }
+
+  function applyTemplateToDay(dateKey, template) {
+    const shiftData = buildWorkShiftPayload({
+      id: uid(),
+      templateCode: template.code,
+      start: template.start,
+      end: template.end,
+    });
+    if (!shiftData.personName) {
+      showToast("Profilname fehlt – bitte neu anmelden");
+      return false;
+    }
+    if (saveWorkShift(dateKey, shiftData)) {
+      renderActiveView();
+      refreshWorkDayDetailIfOpen();
+      showToast(template.code + " eingetragen");
+      return true;
+    }
+    return false;
+  }
+
+  function renderWorkShiftTemplatePicker() {
+    if (!els.workShiftTemplateButtons) return;
+    els.workShiftTemplateButtons.innerHTML = "";
+    if (!shiftTemplates.length) {
+      els.workShiftNoTemplates.classList.remove("hidden");
+      return;
+    }
+    els.workShiftNoTemplates.classList.add("hidden");
+    shiftTemplates.forEach(function (template) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-primary work-template-pick-btn";
+      btn.textContent = template.code + "\n" + template.start + " – " + template.end;
+      btn.addEventListener("click", function () {
+        if (!workShiftModalContext) return;
+        if (applyTemplateToDay(workShiftModalContext.dateKey, template)) {
+          closeWorkShiftModal();
+        }
+      });
+      els.workShiftTemplateButtons.appendChild(btn);
+    });
+  }
+
+  function showWorkShiftPickPanel() {
+    els.workShiftPickPanel.classList.remove("hidden");
+    els.workShiftForm.classList.add("hidden");
+    renderWorkShiftTemplatePicker();
+  }
+
+  function showWorkShiftCustomPanel() {
+    els.workShiftPickPanel.classList.add("hidden");
+    els.workShiftForm.classList.remove("hidden");
+  }
+
   function openWorkShiftModal(dateKey, shiftId) {
-    const personName = savePersonName(els.workPersonName ? els.workPersonName.value : "") || getPersonName();
-    if (!personName) {
-      showToast("Bitte zuerst deinen Namen eintragen");
-      if (els.workPersonName) els.workPersonName.focus();
+    if (!window.WGAuth || !WGAuth.isVerified()) {
+      showToast("Bitte angemeldet sein");
+      return;
+    }
+    const displayName = getWorkDisplayName();
+    if (!displayName) {
+      showToast("Nutzername fehlt – bitte neu anmelden");
       return;
     }
     workShiftModalContext = { dateKey: dateKey, shiftId: shiftId || null };
@@ -1332,19 +1637,26 @@
     els.workShiftDateLabel.textContent = formatLongDate(date);
     if (shiftId) {
       const shift = getWorkShiftsForDay(dateKey).find(function (s) { return s.id === shiftId; });
-      if (!shift || !isCurrentWorkPerson(shift.personName)) {
+      if (!shift || !isOwnWorkShift(shift)) {
         showToast("Nur eigene Schichten bearbeiten");
+        workShiftModalContext = null;
         return;
       }
-      els.workShiftTitle.textContent = "Schicht bearbeiten";
+      els.workShiftTitle.textContent = shift.templateCode
+        ? "Schicht " + shift.templateCode + " bearbeiten"
+        : "Sonder-Schicht bearbeiten";
       els.workShiftStart.value = shift.start;
       els.workShiftEnd.value = shift.end;
       els.deleteWorkShift.classList.remove("hidden");
+      els.workShiftBackPick.classList.add("hidden");
+      showWorkShiftCustomPanel();
     } else {
-      els.workShiftTitle.textContent = "Schicht eintragen";
+      els.workShiftTitle.textContent = "Dienst wählen";
       els.workShiftStart.value = "08:00";
       els.workShiftEnd.value = "17:00";
       els.deleteWorkShift.classList.add("hidden");
+      els.workShiftBackPick.classList.add("hidden");
+      showWorkShiftPickPanel();
     }
     els.workShiftOverlay.classList.remove("hidden");
   }
@@ -1353,23 +1665,29 @@
     workShiftModalContext = null;
     els.workShiftOverlay.classList.add("hidden");
     els.workShiftForm.reset();
+    els.workShiftForm.classList.add("hidden");
+    els.workShiftPickPanel.classList.remove("hidden");
     els.deleteWorkShift.classList.add("hidden");
   }
 
   function handleWorkShiftSubmit(event) {
     event.preventDefault();
     if (!workShiftModalContext) return;
-    const personName = savePersonName(els.workPersonName.value) || getPersonName();
-    if (!personName) {
-      showToast("Bitte deinen Namen eintragen");
-      return;
-    }
-    const shiftData = {
+    const existing = workShiftModalContext.shiftId
+      ? getWorkShiftsForDay(workShiftModalContext.dateKey).find(function (s) {
+        return s.id === workShiftModalContext.shiftId;
+      })
+      : null;
+    const shiftData = buildWorkShiftPayload({
       id: workShiftModalContext.shiftId || uid(),
-      personName: personName,
+      templateCode: existing ? existing.templateCode : null,
       start: els.workShiftStart.value,
       end: els.workShiftEnd.value,
-    };
+    });
+    if (!shiftData.personName) {
+      showToast("Nutzername fehlt");
+      return;
+    }
     if (saveWorkShift(workShiftModalContext.dateKey, shiftData)) {
       closeWorkShiftModal();
       renderActiveView();
@@ -1388,9 +1706,7 @@
   }
 
   function renderWorkView() {
-    if (els.workPersonName) {
-      els.workPersonName.value = getPersonName();
-    }
+    renderWorkTemplatesList();
     const monthStart = getCalendarMonthStart(workMonthOffset);
     const year = monthStart.getFullYear();
     const month = monthStart.getMonth();
@@ -3766,10 +4082,23 @@
     document.getElementById("next-month-work").addEventListener("click", function () {
       changeWorkMonthOffset(1);
     });
-    if (els.workPersonName) {
-      els.workPersonName.addEventListener("change", function () {
-        savePersonName(els.workPersonName.value);
-        renderActiveView();
+    if (els.openAddWorkTemplate) {
+      els.openAddWorkTemplate.addEventListener("click", function () {
+        openWorkTemplateModal(null);
+      });
+    }
+    if (els.workTemplateForm) {
+      els.workTemplateForm.addEventListener("submit", handleWorkTemplateSubmit);
+    }
+    if (els.closeWorkTemplate) {
+      els.closeWorkTemplate.addEventListener("click", closeWorkTemplateModal);
+    }
+    if (els.deleteWorkTemplate) {
+      els.deleteWorkTemplate.addEventListener("click", handleDeleteWorkTemplate);
+    }
+    if (els.workTemplateOverlay) {
+      els.workTemplateOverlay.addEventListener("click", function (e) {
+        if (e.target === els.workTemplateOverlay) closeWorkTemplateModal();
       });
     }
     if (els.closeWorkDayDetail) {
@@ -3787,6 +4116,22 @@
     }
     if (els.workShiftForm) {
       els.workShiftForm.addEventListener("submit", handleWorkShiftSubmit);
+    }
+    if (els.workShiftCustomBtn) {
+      els.workShiftCustomBtn.addEventListener("click", function () {
+        els.workShiftTitle.textContent = "Sonder-Schicht";
+        els.workShiftBackPick.classList.remove("hidden");
+        showWorkShiftCustomPanel();
+      });
+    }
+    if (els.workShiftBackPick) {
+      els.workShiftBackPick.addEventListener("click", function () {
+        if (workShiftModalContext && !workShiftModalContext.shiftId) {
+          els.workShiftTitle.textContent = "Dienst wählen";
+          els.workShiftBackPick.classList.add("hidden");
+          showWorkShiftPickPanel();
+        }
+      });
     }
     if (els.closeWorkShift) {
       els.closeWorkShift.addEventListener("click", closeWorkShiftModal);
@@ -3963,7 +4308,6 @@
       populateUnitSelect(els.stapleUnit, "weight", "g");
     }
     els.sportPersonName.value = getPersonName();
-    if (els.workPersonName) els.workPersonName.value = getPersonName();
     setSportViewDate(new Date());
     updateSyncStatus();
     switchView("home");

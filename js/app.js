@@ -59,6 +59,7 @@
   let pendingWrites = 0;
   let activeView = "home";
   let selectedDishId = null;
+  let editingDishId = null;
   let calendarMonthOffset = 0;
   let sportViewDate = null;
   let dayDetailDateKey = null;
@@ -688,7 +689,7 @@
     const amountInput = document.createElement("input");
     amountInput.type = "number";
     amountInput.className = "ingredient-amount";
-    amountInput.min = "0.01";
+    amountInput.min = "0";
     amountInput.step = "any";
     amountInput.inputMode = "decimal";
     amountInput.placeholder = "Menge";
@@ -699,7 +700,14 @@
     unitSelect.setAttribute("aria-label", "Einheit");
 
     const initialUnit = initial && initial.unit ? initial.unit : null;
-    populateRecipeUnitSelect(unitSelect, initialUnit);
+    const initialAmount = initial && initial.amount != null ? Number(initial.amount) : null;
+    const useChoiceDefault =
+      initial &&
+      initial.name &&
+      !isChoiceUnit(initialUnit) &&
+      (initialAmount == null || !isFinite(initialAmount) || initialAmount <= 0) &&
+      !initialUnit;
+    populateRecipeUnitSelect(unitSelect, useChoiceDefault ? "choice" : initialUnit);
 
     function syncAmountField() {
       const isChoice = isChoiceUnit(unitSelect.value);
@@ -3844,6 +3852,7 @@
   function openDishEdit(dishId) {
     const dish = findDishById(dishId);
     if (!dish) return;
+    editingDishId = dishId;
     selectedDishId = dishId;
     els.editDishName.value = dish.name;
     fillIngredientEditor(els.editDishIngredientsList, dish.ingredients);
@@ -3857,6 +3866,7 @@
     els.dishEditOverlay.classList.add("hidden");
     els.editDishForm.reset();
     els.editDishIngredientsList.innerHTML = "";
+    editingDishId = null;
   }
 
   function openDayPicker() {
@@ -4051,7 +4061,7 @@
       showToast("Bitte zuerst der Gruppe beitreten");
       return;
     }
-    if (!selectedDishId) {
+    if (!editingDishId) {
       showToast("Kein Gericht ausgewählt");
       return;
     }
@@ -4071,7 +4081,7 @@
       showToast("Bitte mindestens eine Zutat mit gültiger Einheit behalten");
       return;
     }
-    const dish = updateDish(selectedDishId, name, ingredients, diet, temp);
+    const dish = updateDish(editingDishId, name, ingredients, diet, temp);
     if (!dish) {
       showToast("Gericht konnte nicht aktualisiert werden");
       return;

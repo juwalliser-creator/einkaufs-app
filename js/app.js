@@ -383,8 +383,7 @@
     let amount = ingredient.amount != null ? Number(ingredient.amount) : null;
     if (amount != null && (!isFinite(amount) || amount <= 0)) amount = null;
     const food = ingredient.foodId ? foods.find(function (f) { return f.id === ingredient.foodId; }) : findFoodByName(name);
-    const unitKind = food ? food.unitKind : unitKindFromUnit(unit);
-    if (unit && unitKind && !isValidUnitForKind(unitKind, unit)) unit = null;
+    if (unit && !unitKindFromUnit(unit)) unit = null;
     return {
       name: name,
       foodId: food ? food.id : (ingredient.foodId || null),
@@ -632,6 +631,26 @@
       : kind.defaultUnit;
   }
 
+  function populateRecipeUnitSelect(selectEl, selectedUnit) {
+    selectEl.innerHTML = "";
+    [
+      { value: "g", label: "g" },
+      { value: "kg", label: "kg" },
+      { value: "ml", label: "ml" },
+      { value: "l", label: "l" },
+      { value: "stk", label: "Stück" },
+      { value: "pack", label: "Pack." },
+      { value: "fl", label: "Flasche" },
+    ].forEach(function (entry) {
+      const option = document.createElement("option");
+      option.value = entry.value;
+      option.textContent = entry.label;
+      selectEl.appendChild(option);
+    });
+    const valid = ["g", "kg", "ml", "l", "stk", "pack", "fl"];
+    selectEl.value = selectedUnit && valid.indexOf(selectedUnit) !== -1 ? selectedUnit : "g";
+  }
+
   function resolveUnitKindForName(name) {
     const food = findFoodByName(name);
     return food ? food.unitKind : "weight";
@@ -662,14 +681,21 @@
     unitSelect.className = "ingredient-unit";
     unitSelect.setAttribute("aria-label", "Einheit");
 
-    function syncUnits() {
-      const unitKind = resolveUnitKindForName(nameInput.value);
-      populateUnitSelect(unitSelect, unitKind, unitSelect.value);
+    const initialUnit = initial && initial.unit ? initial.unit : null;
+    populateRecipeUnitSelect(unitSelect, initialUnit);
+
+    function suggestUnitFromFood() {
+      const food = findFoodByName(nameInput.value);
+      if (food && !amountInput.value.trim()) {
+        unitSelect.value = getDefaultUnit(food.unitKind);
+      }
     }
 
-    nameInput.addEventListener("input", syncUnits);
-    syncUnits();
-    if (initial && initial.unit) unitSelect.value = initial.unit;
+    nameInput.addEventListener("input", suggestUnitFromFood);
+    if (initial && initial.name) {
+      suggestUnitFromFood();
+      if (initialUnit) unitSelect.value = initialUnit;
+    }
 
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
@@ -697,8 +723,7 @@
       const food = findFoodByName(name);
       let amount = amountRaw ? Number(amountRaw) : null;
       if (amount != null && (!isFinite(amount) || amount <= 0)) amount = null;
-      const unitKind = food ? food.unitKind : unitKindFromUnit(unit);
-      if (amount != null && unitKind && !isValidUnitForKind(unitKind, unit)) return;
+      if (amount != null && (!unit || !unitKindFromUnit(unit))) return;
       ingredients.push({
         name: name,
         foodId: food ? food.id : null,
@@ -3792,7 +3817,6 @@
     els.dishEditOverlay.classList.add("hidden");
     els.editDishForm.reset();
     els.editDishIngredientsList.innerHTML = "";
-    selectedDishId = null;
   }
 
   function openDayPicker() {
@@ -3952,6 +3976,10 @@
       return;
     }
     const name = els.newDishName.value;
+    if (!ingredientsHaveAmounts(els.addDishIngredientsList)) {
+      showToast("Bitte für jede Zutat eine Menge angeben");
+      return;
+    }
     const ingredients = readIngredientsFromEditor(els.addDishIngredientsList);
     const diet = getRadioValue("new-dish-diet");
     const temp = getRadioValue("new-dish-temp");
@@ -3964,14 +3992,14 @@
       return;
     }
     if (ingredients.length === 0) {
-      showToast("Bitte mindestens eine Zutat hinzufügen");
-      return;
-    }
-    if (!ingredientsHaveAmounts(els.addDishIngredientsList)) {
-      showToast("Bitte für jede Zutat eine Menge angeben");
+      showToast("Bitte mindestens eine Zutat mit gültiger Einheit hinzufügen");
       return;
     }
     const dish = addDish(name, ingredients, diet, temp);
+    if (!dish) {
+      showToast("Gericht konnte nicht gespeichert werden");
+      return;
+    }
     closeDishAddModal();
     renderDishes();
     showToast('Gericht "' + dish.name + '" gespeichert');
@@ -3979,9 +4007,20 @@
 
   function handleEditDish(event) {
     event.preventDefault();
-    if (!roomRef || !selectedDishId) return;
-    const name = els.editDishName.value;
+    if (!roomRef) {
+      showToast("Bitte zuerst der Gruppe beitreten");
+      return;
+    }
+    if (!selectedDishId) {
+      showToast("Kein Gericht ausgewählt");
+      return;
+    }
+    if (!ingredientsHaveAmounts(els.editDishIngredientsList)) {
+      showToast("Bitte für jede Zutat eine Menge angeben");
+      return;
+    }
     const ingredients = readIngredientsFromEditor(els.editDishIngredientsList);
+    const name = els.editDishName.value;
     const diet = getRadioValue("edit-dish-diet");
     const temp = getRadioValue("edit-dish-temp");
     if (!normalizeName(name) || !diet || !temp) {
@@ -3989,15 +4028,14 @@
       return;
     }
     if (ingredients.length === 0) {
-      showToast("Bitte mindestens eine Zutat behalten");
-      return;
-    }
-    if (!ingredientsHaveAmounts(els.editDishIngredientsList)) {
-      showToast("Bitte für jede Zutat eine Menge angeben");
+      showToast("Bitte mindestens eine Zutat mit gültiger Einheit behalten");
       return;
     }
     const dish = updateDish(selectedDishId, name, ingredients, diet, temp);
-    if (!dish) return;
+    if (!dish) {
+      showToast("Gericht konnte nicht aktualisiert werden");
+      return;
+    }
     closeDishEditModal();
     renderDishes();
     if (activeView === "shopping") renderShoppingList();

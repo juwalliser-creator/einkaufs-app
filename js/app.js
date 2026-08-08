@@ -301,7 +301,12 @@
     return UNIT_KINDS[unitKind] ? UNIT_KINDS[unitKind].defaultUnit : "g";
   }
 
+  function isChoiceUnit(unit) {
+    return unit === "choice";
+  }
+
   function unitKindFromUnit(unit) {
+    if (isChoiceUnit(unit)) return null;
     if (unit === "g" || unit === "kg") return "weight";
     if (unit === "ml" || unit === "l") return "volume";
     if (unit === "stk") return "piece";
@@ -383,6 +388,14 @@
     let amount = ingredient.amount != null ? Number(ingredient.amount) : null;
     if (amount != null && (!isFinite(amount) || amount <= 0)) amount = null;
     const food = ingredient.foodId ? foods.find(function (f) { return f.id === ingredient.foodId; }) : findFoodByName(name);
+    if (isChoiceUnit(unit)) {
+      return {
+        name: name,
+        foodId: food ? food.id : (ingredient.foodId || null),
+        amount: null,
+        unit: "choice",
+      };
+    }
     if (unit && !unitKindFromUnit(unit)) unit = null;
     return {
       name: name,
@@ -567,6 +580,9 @@
   }
 
   function formatIngredientLabel(ingredient) {
+    if (isChoiceUnit(ingredient.unit)) {
+      return ingredient.name + " (nach Wahl)";
+    }
     if (ingredient.amount != null && ingredient.unit) {
       return formatQuantity(ingredient.amount, ingredient.unit) + " " + ingredient.name;
     }
@@ -634,6 +650,7 @@
   function populateRecipeUnitSelect(selectEl, selectedUnit) {
     selectEl.innerHTML = "";
     [
+      { value: "choice", label: "nach Wahl" },
       { value: "g", label: "g" },
       { value: "kg", label: "kg" },
       { value: "ml", label: "ml" },
@@ -647,7 +664,7 @@
       option.textContent = entry.label;
       selectEl.appendChild(option);
     });
-    const valid = ["g", "kg", "ml", "l", "stk", "pack", "fl"];
+    const valid = ["choice", "g", "kg", "ml", "l", "stk", "pack", "fl"];
     selectEl.value = selectedUnit && valid.indexOf(selectedUnit) !== -1 ? selectedUnit : "g";
   }
 
@@ -684,17 +701,29 @@
     const initialUnit = initial && initial.unit ? initial.unit : null;
     populateRecipeUnitSelect(unitSelect, initialUnit);
 
+    function syncAmountField() {
+      const isChoice = isChoiceUnit(unitSelect.value);
+      amountInput.disabled = isChoice;
+      amountInput.placeholder = isChoice ? "—" : "Menge";
+      if (isChoice) amountInput.value = "";
+    }
+
     function suggestUnitFromFood() {
+      if (isChoiceUnit(unitSelect.value)) return;
       const food = findFoodByName(nameInput.value);
       if (food && !amountInput.value.trim()) {
         unitSelect.value = getDefaultUnit(food.unitKind);
       }
     }
 
+    unitSelect.addEventListener("change", syncAmountField);
     nameInput.addEventListener("input", suggestUnitFromFood);
     if (initial && initial.name) {
-      suggestUnitFromFood();
       if (initialUnit) unitSelect.value = initialUnit;
+      syncAmountField();
+      if (!isChoiceUnit(unitSelect.value)) suggestUnitFromFood();
+    } else {
+      syncAmountField();
     }
 
     const removeBtn = document.createElement("button");
@@ -721,6 +750,15 @@
       const amountRaw = row.querySelector(".ingredient-amount").value.trim();
       const unit = row.querySelector(".ingredient-unit").value;
       const food = findFoodByName(name);
+      if (isChoiceUnit(unit)) {
+        ingredients.push({
+          name: name,
+          foodId: food ? food.id : null,
+          amount: null,
+          unit: "choice",
+        });
+        return;
+      }
       let amount = amountRaw ? Number(amountRaw) : null;
       if (amount != null && (!isFinite(amount) || amount <= 0)) amount = null;
       if (amount != null && (!unit || !unitKindFromUnit(unit))) return;
@@ -756,8 +794,10 @@
     container.querySelectorAll(".ingredient-row").forEach(function (row) {
       const name = normalizeName(row.querySelector(".ingredient-name").value);
       const amountRaw = row.querySelector(".ingredient-amount").value.trim();
+      const unit = row.querySelector(".ingredient-unit").value;
       if (!name) return;
       hasNamedRow = true;
+      if (isChoiceUnit(unit)) return;
       if (!amountRaw || Number(amountRaw) <= 0) valid = false;
     });
     return hasNamedRow && valid;
@@ -3977,7 +4017,7 @@
     }
     const name = els.newDishName.value;
     if (!ingredientsHaveAmounts(els.addDishIngredientsList)) {
-      showToast("Bitte für jede Zutat eine Menge angeben");
+      showToast("Bitte für jede Zutat eine Menge angeben oder „nach Wahl“ wählen");
       return;
     }
     const ingredients = readIngredientsFromEditor(els.addDishIngredientsList);
@@ -4016,7 +4056,7 @@
       return;
     }
     if (!ingredientsHaveAmounts(els.editDishIngredientsList)) {
-      showToast("Bitte für jede Zutat eine Menge angeben");
+      showToast("Bitte für jede Zutat eine Menge angeben oder „nach Wahl“ wählen");
       return;
     }
     const ingredients = readIngredientsFromEditor(els.editDishIngredientsList);

@@ -722,6 +722,12 @@ textarea:focus {
   font-family: inherit;
 }
 
+.ingredient-row input:disabled {
+  background: var(--surface-2, #f4f4f5);
+  color: var(--muted, #888);
+  cursor: not-allowed;
+}
+
 .ingredient-add-btn {
   margin-bottom: 0.25rem;
 }
